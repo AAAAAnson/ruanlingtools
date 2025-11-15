@@ -1,326 +1,189 @@
-# Soft Collar Toolbox 2.0 - Deployment Guide
+# Soft Collar Toolbox 2.0 - 部署文档
 
-## Quick Start
+## 📋 目录
 
-This guide will help you deploy the Soft Collar Toolbox 2.0 on your Synology NAS using Docker.
-
-## Prerequisites
-
-- Synology NAS with DSM 7.0 or higher
-- Container Manager (Docker) installed
-- At least 2GB of free RAM
-- At least 1GB of free disk space
-
-## Deployment Options
-
-### Option 1: Docker Compose (Recommended)
-
-This is the easiest and recommended method for Synology NAS deployment.
-
-#### Step 1: Prepare Files
-
-1. Download or clone the project to your local machine
-2. Ensure all project files are present
-
-#### Step 2: Upload to Synology
-
-1. Open File Station on your Synology
-2. Navigate to `/docker/` (create if it doesn't exist)
-3. Create a new folder: `toolbox-2.0`
-4. Upload all project files to `/docker/toolbox-2.0`
-
-#### Step 3: Deploy with Container Manager
-
-1. Open **Container Manager** (formerly Docker)
-2. Go to **Project** tab
-3. Click **Create**
-4. Set the following:
-   - **Project Name**: `toolbox-2.0`
-   - **Path**: `/docker/toolbox-2.0`
-   - **Source**: `docker-compose.yml`
-5. Click **Next**
-6. Review the configuration (port 8888 for frontend, 8000 for backend)
-7. Click **Done**
-
-#### Step 4: Wait for Build
-
-The initial build will take 5-10 minutes. You can monitor progress in Container Manager.
-
-#### Step 5: Access the Application
-
-Once deployed, access the application at:
-```
-http://YOUR_NAS_IP:8888
-```
-
-Replace `YOUR_NAS_IP` with your Synology NAS IP address.
+1. [系统要求](#系统要求)
+2. [快速开始](#快速开始)  
+3. [详细部署步骤](#详细部署步骤)
+4. [Synology NAS 部署](#synology-nas-部署)
+5. [环境变量配置](#环境变量配置)
+6. [常用管理命令](#常用管理命令)
+7. [故障排除](#故障排除)
 
 ---
 
-### Option 2: Manual Docker Commands
+## 系统要求
 
-If you prefer command line or SSH access:
+### 最低要求
+- **CPU**: 2 核心
+- **内存**: 2GB RAM
+- **存储**: 10GB 可用空间
+- **Docker**: 20.10.0+
+- **Docker Compose**: 2.0.0+
 
-```bash
-# Navigate to project directory
-cd /docker/toolbox-2.0
-
-# Build and start containers
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-
-# Stop containers
-docker-compose down
-```
+### 推荐配置
+- **CPU**: 4 核心
+- **内存**: 4GB RAM
+- **存储**: 20GB 可用空间
 
 ---
 
-## Configuration
+## 快速开始
 
-### Environment Variables
+### 1. 克隆项目
 
-#### Backend Configuration
+\`\`\`bash
+git clone https://github.com/yourusername/ruanlingtools.git
+cd ruanlingtools
+\`\`\`
 
-Create or modify `backend/.env` file:
+### 2. 配置环境变量
 
-```env
-DEBUG=False
-HOST=0.0.0.0
-PORT=8000
-CORS_ORIGINS=http://YOUR_NAS_IP:8888
-MAX_FILE_SIZE=52428800
-```
+\`\`\`bash
+cp .env.example .env
+nano .env
+\`\`\`
 
-#### Frontend Configuration
+### 3. 一键部署
 
-The frontend uses environment variables set in `docker-compose.yml`:
-- `NEXT_PUBLIC_API_URL`: Backend API URL (default: http://backend:8000)
+\`\`\`bash
+chmod +x deploy.sh
+./deploy.sh deploy
+\`\`\`
 
-### Port Configuration
+### 4. 访问应用
 
-Default ports:
-- **Frontend**: 8888
-- **Backend**: 8000
-
-To change the frontend port, edit `docker-compose.yml`:
-```yaml
-ports:
-  - "YOUR_PORT:3000"  # Change YOUR_PORT to desired port
-```
+- **应用主页**: http://your-server-ip:8888
+- **API 文档**: http://your-server-ip:8888/docs
 
 ---
 
-## Updating the Application
+## 详细部署步骤
 
-### Method 1: Rebuild with Container Manager
+### 步骤 1: 安装 Docker
 
-1. Open Container Manager
-2. Select the `toolbox-2.0` project
-3. Click **Action** → **Build**
-4. Wait for rebuild to complete
+**Ubuntu/Debian:**
+\`\`\`bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker \$USER
+\`\`\`
 
-### Method 2: Command Line
+### 步骤 2: 安装 Docker Compose
 
-```bash
-cd /docker/toolbox-2.0
+\`\`\`bash
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+\`\`\`
 
-# Pull latest code (if using git)
-git pull
+### 步骤 3: 配置环境
 
-# Rebuild and restart
-docker-compose down
-docker-compose up -d --build
-```
+\`\`\`bash
+cp .env.example .env
+# 编辑 .env 文件，修改以下关键配置：
+# - NGINX_PORT (默认 8888)
+# - NEXT_PUBLIC_API_URL
+# - CORS_ORIGINS
+\`\`\`
 
----
+### 步骤 4: 部署
 
-## Troubleshooting
-
-### Application won't start
-
-**Check logs:**
-```bash
-docker-compose logs -f
-```
-
-**Common issues:**
-- Port already in use
-- Insufficient memory
-- File permission issues
-
-**Solutions:**
-1. Change port in `docker-compose.yml`
-2. Ensure at least 2GB RAM is available
-3. Check file permissions: `chmod -R 755 /docker/toolbox-2.0`
-
-### Cannot access application
-
-**Check:**
-1. Containers are running: `docker-compose ps`
-2. Firewall settings on Synology
-3. Correct IP address and port
-4. Network connectivity
-
-**Test backend API:**
-```
-http://YOUR_NAS_IP:8000/docs
-```
-
-Should show FastAPI documentation.
-
-### High memory usage
-
-The application is optimized for minimal resource usage, but if experiencing issues:
-
-1. Limit container memory in `docker-compose.yml`:
-```yaml
-services:
-  frontend:
-    mem_limit: 512m
-  backend:
-    mem_limit: 512m
-```
-
-2. Restart containers:
-```bash
-docker-compose restart
-```
+\`\`\`bash
+./deploy.sh deploy
+\`\`\`
 
 ---
 
-## Maintenance
+## Synology NAS 部署
 
-### View Logs
+### SSH 部署
 
-```bash
-# All logs
-docker-compose logs -f
+1. 启用 SSH (DSM > 控制面板 > 终端机和 SNMP)
+2. SSH 连接到 NAS
+3. 执行部署命令：
 
-# Frontend only
-docker-compose logs -f frontend
+\`\`\`bash
+cd /volume1/docker
+git clone https://github.com/yourusername/ruanlingtools.git
+cd ruanlingtools
+cp .env.example .env
+vi .env
+./deploy.sh deploy
+\`\`\`
 
-# Backend only
+### 配置反向代理
+
+DSM > 控制面板 > 登录门户 > 高级 > 反向代理服务器
+
+- 来源: your-domain.synology.me/toolbox
+- 目标: localhost:8888
+
+---
+
+## 环境变量配置
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| NGINX_PORT | Nginx 端口 | 8888 |
+| NEXT_PUBLIC_API_URL | API 地址 | http://localhost:8888/api |
+| CORS_ORIGINS | CORS 源 | http://localhost:8888 |
+| DEBUG | 调试模式 | False |
+
+---
+
+## 常用管理命令
+
+\`\`\`bash
+./deploy.sh start      # 启动服务
+./deploy.sh stop       # 停止服务
+./deploy.sh restart    # 重启服务
+./deploy.sh status     # 查看状态
+./deploy.sh logs       # 查看日志
+./deploy.sh health     # 健康检查
+./deploy.sh update     # 更新应用
+./deploy.sh clean      # 清理容器
+\`\`\`
+
+---
+
+## 故障排除
+
+### 端口被占用
+
+\`\`\`bash
+sudo lsof -i :8888
+# 修改 .env 中的 NGINX_PORT
+\`\`\`
+
+### 查看日志
+
+\`\`\`bash
 docker-compose logs -f backend
-```
+docker-compose logs -f frontend
+\`\`\`
 
-### Clear Old Files
+### 重新构建
 
-Backend automatically stores uploaded files temporarily. To clear:
-
-```bash
-# Clear uploads
-rm -rf backend/uploads/*
-
-# Clear outputs
-rm -rf backend/outputs/*
-```
-
-Or set up automatic cleanup:
-```bash
-# Add to crontab
-0 2 * * * docker exec toolbox-backend rm -rf /app/uploads/* /app/outputs/*
-```
-
-### Backup
-
-Important files to backup:
-- `docker-compose.yml`
-- `backend/.env`
-- `backend/app.log` (optional)
-
----
-
-## Performance Optimization
-
-### For Synology NAS
-
-1. **Use SSD Cache** (if available)
-2. **Allocate sufficient RAM** (minimum 2GB)
-3. **Enable SSH** for easier maintenance
-4. **Regular updates** for Docker and Container Manager
-
-### Application Settings
-
-1. **Disable DEBUG mode** in production (`DEBUG=False`)
-2. **Limit file upload size** based on your needs
-3. **Clear temporary files** regularly
-
----
-
-## Security Recommendations
-
-1. **Change default ports** if exposed to internet
-2. **Use reverse proxy** (e.g., Nginx Proxy Manager)
-3. **Enable HTTPS** with SSL certificates
-4. **Restrict CORS origins** in production
-5. **Regular updates** to keep dependencies secure
-
----
-
-## Uninstalling
-
-### Remove Application
-
-```bash
-# Stop and remove containers
+\`\`\`bash
 docker-compose down
-
-# Remove images
-docker rmi toolbox-frontend toolbox-backend
-
-# Remove project folder (optional)
-rm -rf /docker/toolbox-2.0
-```
-
-### Clean Up
-
-```bash
-# Remove unused images
-docker image prune -a
-
-# Remove unused volumes
-docker volume prune
-```
+docker-compose build --no-cache
+docker-compose up -d
+\`\`\`
 
 ---
 
-## Getting Help
+## 备份数据
 
-If you encounter issues:
+\`\`\`bash
+# 备份上传文件
+docker run --rm -v ruanlingtools_backend-uploads:/data -v \$(pwd):/backup alpine tar czf /backup/uploads-backup.tar.gz -C /data .
 
-1. Check the logs first
-2. Review this troubleshooting guide
-3. Ensure all prerequisites are met
-4. Check Synology forums for Container Manager issues
-
----
-
-## Version Information
-
-- **Application Version**: 0.1.0
-- **Docker Compose Version**: 3.8
-- **Node.js Version**: 18
-- **Python Version**: 3.11
+# 备份配置
+tar czf config-backup.tar.gz .env docker-compose.yml nginx/
+\`\`\`
 
 ---
 
-## Next Steps
-
-After successful deployment:
-
-1. Access the application at `http://YOUR_NAS_IP:8888`
-2. Explore available tools
-3. Test image conversion features (P1 phase)
-4. Wait for updates with new features (P2, P3 phases)
-
-**Note**: P0 phase includes framework and placeholders. Features will be implemented in subsequent phases (P1, P2, P3).
-
----
-
-**Last Updated**: 2025-11-15  
-**Documentation Version**: 1.0
+**部署成功后，请享受工具箱带来的便利！** 🎉
