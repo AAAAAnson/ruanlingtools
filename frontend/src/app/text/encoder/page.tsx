@@ -147,23 +147,19 @@ export default function EncoderPage() {
                   <PixelSelect
                     value={encodingType}
                     onChange={(e) => setEncodingType(e.target.value as EncodingType)}
-                  >
-                    {encodingOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </PixelSelect>
+                    options={encodingOptions}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Mode</label>
                   <PixelSelect
                     value={mode}
                     onChange={(e) => setMode(e.target.value as 'encode' | 'decode')}
-                  >
-                    <option value="encode">Encode</option>
-                    <option value="decode">Decode</option>
-                  </PixelSelect>
+                    options={[
+                      { value: 'encode', label: 'Encode' },
+                      { value: 'decode', label: 'Decode' }
+                    ]}
+                  />
                 </div>
               </div>
               <p className="text-sm text-pixel-text-secondary mt-3">

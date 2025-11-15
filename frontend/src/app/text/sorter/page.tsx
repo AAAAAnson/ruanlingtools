@@ -193,12 +193,13 @@ Item 5`);
                   <PixelSelect
                     value={sortType}
                     onChange={(e) => setSortType(e.target.value as SortType)}
-                  >
-                    <option value="alphabetical">Alphabetical (A-Z)</option>
-                    <option value="numerical">Numerical (0-9)</option>
-                    <option value="length">By Length (Short-Long)</option>
-                    <option value="random">Random Shuffle</option>
-                  </PixelSelect>
+                    options={[
+                      { value: 'alphabetical', label: 'Alphabetical (A-Z)' },
+                      { value: 'numerical', label: 'Numerical (0-9)' },
+                      { value: 'length', label: 'By Length (Short-Long)' },
+                      { value: 'random', label: 'Random Shuffle' }
+                    ]}
+                  />
                 </div>
               </div>
             </PixelCard>

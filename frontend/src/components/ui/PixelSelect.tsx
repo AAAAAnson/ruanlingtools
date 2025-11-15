@@ -1,16 +1,17 @@
 'use client';
 
-import { SelectHTMLAttributes, forwardRef } from 'react';
+import { SelectHTMLAttributes, forwardRef, ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface PixelSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
+  children?: ReactNode;
 }
 
 export const PixelSelect = forwardRef<HTMLSelectElement, PixelSelectProps>(
-  ({ label, error, options, className = '', ...props }, ref) => {
+  ({ label, error, options, children, className = '', ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
@@ -24,11 +25,15 @@ export const PixelSelect = forwardRef<HTMLSelectElement, PixelSelectProps>(
             className={`pixel-input pr-10 appearance-none ${error ? 'border-danger' : ''} ${className}`}
             {...props}
           >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {options ? (
+              options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            ) : (
+              children
+            )}
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" />
         </div>

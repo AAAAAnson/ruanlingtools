@@ -266,11 +266,12 @@ export default function ImageConvertPage() {
                   <PixelSelect
                     value={outputFormat}
                     onChange={(e) => setOutputFormat(e.target.value)}
-                  >
-                    <option value="jpg">JPG</option>
-                    <option value="png">PNG</option>
-                    <option value="webp">WebP</option>
-                  </PixelSelect>
+                    options={[
+                      { value: 'jpg', label: 'JPG' },
+                      { value: 'png', label: 'PNG' },
+                      { value: 'webp', label: 'WebP' }
+                    ]}
+                  />
                 </div>
 
                 <div>
