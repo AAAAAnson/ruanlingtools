@@ -114,13 +114,14 @@ async def health_check():
     )
 
 
-# Include routers (to be implemented)
-# from routers import image, text, pdf, ai, youtube
-# app.include_router(image.router, prefix="/api/image", tags=["image"])
-# app.include_router(text.router, prefix="/api/text", tags=["text"])
-# app.include_router(pdf.router, prefix="/api/pdf", tags=["pdf"])
-# app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
-# app.include_router(youtube.router, prefix="/api/youtube", tags=["youtube"])
+# Include routers
+from routers import image, text, pdf, ai, youtube
+
+app.include_router(image.router, prefix="/api/image", tags=["Image Tools"])
+app.include_router(text.router, prefix="/api/text", tags=["Text Tools"])
+app.include_router(pdf.router, prefix="/api/pdf", tags=["PDF Tools"])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI Tools"])
+app.include_router(youtube.router, prefix="/api/youtube", tags=["YouTube Tools"])
 
 
 # Startup event
