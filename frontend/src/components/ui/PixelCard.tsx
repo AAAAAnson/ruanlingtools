@@ -7,6 +7,7 @@ import { cardHoverAnimation } from '@/lib/animations';
 interface PixelCardProps {
   children: ReactNode;
   title?: string;
+  icon?: ReactNode;
   className?: string;
   hoverable?: boolean;
   onClick?: () => void;
@@ -15,6 +16,7 @@ interface PixelCardProps {
 export function PixelCard({
   children,
   title,
+  icon,
   className = '',
   hoverable = true,
   onClick,
@@ -32,7 +34,8 @@ export function PixelCard({
       style={{ cursor: onClick ? 'pointer' : 'default' }}
     >
       {title && (
-        <h3 className="font-pixel text-lg mb-4 text-primary">
+        <h3 className="font-pixel text-lg mb-4 text-primary flex items-center gap-2">
+          {icon && <span className="inline-flex">{icon}</span>}
           {title}
         </h3>
       )}
