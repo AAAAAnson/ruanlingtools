@@ -11,8 +11,8 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including devDependencies needed for build)
+RUN npm ci
 
 # Stage 2: Builder
 FROM node:18-alpine AS builder
@@ -27,6 +27,9 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copy source code
 COPY . .
+
+# Ensure public directory exists
+RUN mkdir -p ./public
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1 \
@@ -51,6 +54,9 @@ ENV NODE_ENV=production \
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
+
+# Create public directory
+RUN mkdir -p ./public
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
