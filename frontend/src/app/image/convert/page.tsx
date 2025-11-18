@@ -152,7 +152,7 @@ export default function ImageConvertPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <PixelCard title="Upload Images" icon={<FileImage size={20} />}>
+            <PixelCard title="Upload Images">
               <PixelUpload
                 multiple={true}
                 accept="image/*"
@@ -178,7 +178,7 @@ export default function ImageConvertPage() {
             </PixelCard>
 
             {isConverting && (
-              <PixelCard title="Converting..." icon={<ImageIcon size={20} />}>
+              <PixelCard title="Converting...">
                 <PixelProgress value={progress} max={100} />
                 <p className="text-sm text-pixel-text-secondary mt-2">
                   Processing {files.length} image(s)...
@@ -257,7 +257,7 @@ export default function ImageConvertPage() {
           </div>
 
           <div className="space-y-6">
-            <PixelCard title="Conversion Settings" icon={<ImageIcon size={20} />}>
+            <PixelCard title="Conversion Settings">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
