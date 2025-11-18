@@ -8,7 +8,7 @@ export default function WatermarkPage() {
     <MainLayout>
       <ComingSoon
         title="Image Watermark"
-        description="Add text or image watermarks to your photos"
+        message="Add text or image watermarks to your photos"
       />
     </MainLayout>
   );
