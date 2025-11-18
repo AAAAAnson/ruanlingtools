@@ -23,7 +23,7 @@ export function PixelUpload({
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
-      if (\!files) return;
+      if (!files) return;
       const fileArray = Array.from(files).slice(0, maxFiles);
       const validFiles = fileArray.filter(
         (file) => file.size <= maxSizeMB * 1024 * 1024
@@ -35,7 +35,7 @@ export function PixelUpload({
   );
 
   const removeFile = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i \!== index);
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
     setSelectedFiles(newFiles);
     onFilesSelected(newFiles);
   };
