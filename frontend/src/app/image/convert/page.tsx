@@ -299,156 +299,182 @@ export default function ImageConvertPage() {
                 )}
               </div>
 
-              {/* Upload Area - 如果有文件则变小 */}
-              <div className={fileItems.length > 0 ? 'mb-4' : ''}>
-                <PixelUpload
-                  multiple={true}
-                  accept="image/*"
-                  maxSizeMB={10}
-                  onFilesSelected={handleFilesSelected}
-                />
-              </div>
-
-              {/* File List - 只在有文件时显示 */}
-              {fileItems.length > 0 && (
-                <>
-                  {/* Statistics */}
-                  <div className="flex gap-4 mb-4 text-xs pb-3 border-b border-[#333344]">
-                    {pendingCount > 0 && (
-                      <span className="text-gray-400">Pending: {pendingCount}</span>
-                    )}
-                    {convertingCount > 0 && (
-                      <span className="text-yellow-400">Converting: {convertingCount}</span>
-                    )}
-                    {successCount > 0 && (
-                      <span className="text-green-400">Success: {successCount}</span>
-                    )}
-                    {errorCount > 0 && (
-                      <span className="text-red-400">Failed: {errorCount}</span>
-                    )}
-                  </div>
-
-                  {/* File Items */}
-                  <div className="space-y-2 mb-4">
-                    {fileItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="border-2 border-[#333344] p-3 bg-[#0F0F1E] rounded hover:border-[#4ECDC4]/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* Thumbnail - 固定高度不超过文字的1.68倍 (约27px) */}
-                          <div className="flex-shrink-0 w-7 h-7 rounded border border-[#333344] overflow-hidden bg-black/30">
-                            <img
-                              src={item.preview}
-                              alt={item.file.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-
-                          {/* File Info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" title={item.file.name}>
-                              {item.file.name}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
-                              <span>{formatFileSize(item.file.size)}</span>
-                              {item.result && (
-                                <>
-                                  <span>→</span>
-                                  <span className="text-[#4ECDC4]">
-                                    {formatFileSize(item.result.size)} ({item.result.output_format.toUpperCase()})
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Status Indicator */}
-                          <div className="flex-shrink-0 min-w-[100px]">
-                            {item.status === 'pending' && (
-                              <span className="text-xs text-gray-400 flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                                Ready
-                              </span>
-                            )}
-                            {item.status === 'converting' && (
-                              <div className="flex items-center gap-2">
-                                <Loader2 size={14} className="animate-spin text-yellow-400" />
-                                <span className="text-xs text-yellow-400">{item.progress || 0}%</span>
-                              </div>
-                            )}
-                            {item.status === 'success' && (
-                              <span className="text-xs text-green-400 flex items-center gap-1">
-                                <CheckCircle size={14} />
-                                Complete
-                              </span>
-                            )}
-                            {item.status === 'error' && (
-                              <span className="text-xs text-red-400 flex items-center gap-1" title={item.error}>
-                                <XCircle size={14} />
-                                Failed
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex gap-1 flex-shrink-0">
-                            {item.status === 'success' && item.result && (
-                              <>
-                                <PixelButton
-                                  size="sm"
-                                  variant="secondary"
-                                  icon={<Eye size={12} />}
-                                  onClick={() => handlePreview(item)}
-                                  title="Preview"
-                                />
-                                <PixelButton
-                                  size="sm"
-                                  icon={<Download size={12} />}
-                                  onClick={() => handleDownload(item.result!.converted_filename)}
-                                  title="Download"
-                                />
-                              </>
-                            )}
-                            {(item.status === 'pending' || item.status === 'error') && (
-                              <PixelButton
-                                size="sm"
-                                variant="danger"
-                                icon={<X size={12} />}
-                                onClick={() => handleRemoveFile(item.id)}
-                                disabled={isConverting}
-                                title="Remove"
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Error Message */}
-                        {item.error && (
-                          <div className="mt-2 text-xs text-red-300 bg-red-900/20 p-2 rounded border border-red-500/30">
-                            {item.error}
-                          </div>
+              {/* Unified Upload & File List Area */}
+              <div>
+                {/* 如果没有文件，显示大的上传区域 */}
+                {fileItems.length === 0 ? (
+                  <PixelUpload
+                    multiple={true}
+                    accept="image/*"
+                    maxSizeMB={10}
+                    onFilesSelected={handleFilesSelected}
+                  />
+                ) : (
+                  <>
+                    {/* File List with integrated upload */}
+                    <div className="border-2 border-dashed border-[#4ECDC4]/30 rounded-lg p-4 bg-[#0F0F1E]/50">
+                      {/* Statistics */}
+                      <div className="flex gap-4 mb-4 text-xs">
+                        {pendingCount > 0 && (
+                          <span className="text-gray-400">Pending: {pendingCount}</span>
+                        )}
+                        {convertingCount > 0 && (
+                          <span className="text-yellow-400">Converting: {convertingCount}</span>
+                        )}
+                        {successCount > 0 && (
+                          <span className="text-green-400">Success: {successCount}</span>
+                        )}
+                        {errorCount > 0 && (
+                          <span className="text-red-400">Failed: {errorCount}</span>
                         )}
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Convert Button */}
-                  {pendingCount > 0 && (
-                    <div className="pt-4 border-t border-[#333344]">
-                      <PixelButton
-                        icon={<ImageIcon size={16} />}
-                        onClick={handleConvert}
-                        disabled={isConverting}
-                        loading={isConverting}
-                        className="w-full"
-                      >
-                        Convert {pendingCount} Image{pendingCount > 1 ? 's' : ''}
-                      </PixelButton>
+                      {/* File Items */}
+                      <div className="space-y-2 mb-4">
+                        {fileItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="border-2 border-[#333344] p-3 bg-[#1A1A2E] rounded hover:border-[#4ECDC4]/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              {/* Thumbnail */}
+                              <div className="flex-shrink-0 w-7 h-7 rounded border border-[#333344] overflow-hidden bg-black/30">
+                                <img
+                                  src={item.preview}
+                                  alt={item.file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+
+                              {/* File Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={item.file.name}>
+                                  {item.file.name}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span>{formatFileSize(item.file.size)}</span>
+                                  {item.result && (
+                                    <>
+                                      <span>→</span>
+                                      <span className="text-[#4ECDC4]">
+                                        {formatFileSize(item.result.size)} ({item.result.output_format.toUpperCase()})
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Status Indicator */}
+                              <div className="flex-shrink-0 min-w-[100px]">
+                                {item.status === 'pending' && (
+                                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                    Ready
+                                  </span>
+                                )}
+                                {item.status === 'converting' && (
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 size={14} className="animate-spin text-yellow-400" />
+                                    <span className="text-xs text-yellow-400">{item.progress || 0}%</span>
+                                  </div>
+                                )}
+                                {item.status === 'success' && (
+                                  <span className="text-xs text-green-400 flex items-center gap-1">
+                                    <CheckCircle size={14} />
+                                    Complete
+                                  </span>
+                                )}
+                                {item.status === 'error' && (
+                                  <span className="text-xs text-red-400 flex items-center gap-1" title={item.error}>
+                                    <XCircle size={14} />
+                                    Failed
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex gap-1 flex-shrink-0">
+                                {item.status === 'success' && item.result && (
+                                  <>
+                                    <PixelButton
+                                      size="sm"
+                                      variant="secondary"
+                                      icon={<Eye size={12} />}
+                                      onClick={() => handlePreview(item)}
+                                      title="Preview"
+                                    />
+                                    <PixelButton
+                                      size="sm"
+                                      icon={<Download size={12} />}
+                                      onClick={() => handleDownload(item.result!.converted_filename)}
+                                      title="Download"
+                                    />
+                                  </>
+                                )}
+                                {(item.status === 'pending' || item.status === 'error') && (
+                                  <PixelButton
+                                    size="sm"
+                                    variant="danger"
+                                    icon={<X size={12} />}
+                                    onClick={() => handleRemoveFile(item.id)}
+                                    disabled={isConverting}
+                                    title="Remove"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {item.error && (
+                              <div className="mt-2 text-xs text-red-300 bg-red-900/20 p-2 rounded border border-red-500/30">
+                                {item.error}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Compact Upload Area - 继续添加文件 */}
+                      <div className="border-2 border-dashed border-[#333344] rounded p-3 text-center hover:border-[#4ECDC4]/50 transition-colors cursor-pointer">
+                        <label className="cursor-pointer block">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 0) {
+                                handleFilesSelected(files);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                            <Upload size={16} />
+                            <span>Click to add more images or drop them here</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
+
+                    {/* Convert Button */}
+                    {pendingCount > 0 && (
+                      <div className="mt-4">
+                        <PixelButton
+                          icon={<ImageIcon size={16} />}
+                          onClick={handleConvert}
+                          disabled={isConverting}
+                          loading={isConverting}
+                          className="w-full"
+                        >
+                          Convert {pendingCount} Image{pendingCount > 1 ? 's' : ''}
+                        </PixelButton>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </PixelCard>
           </div>
 
