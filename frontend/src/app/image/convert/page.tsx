@@ -156,7 +156,7 @@ export default function ImageConvertPage() {
               <PixelUpload
                 multiple={true}
                 accept="image/*"
-                maxSize={10 * 1024 * 1024}
+                maxSizeMB={10}
                 onFilesSelected={handleFilesSelected}
               />
               {files.length > 0 && (
