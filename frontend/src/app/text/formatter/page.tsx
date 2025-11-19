@@ -163,7 +163,7 @@ And some punctuation!!!
               <div className="space-y-3">
                 <PixelCheckbox
                   checked={options.trim}
-                  onChange={(checked) => setOptions({...options, trim: checked})}
+                  onChange={(e) => setOptions({...options, trim: e.target.checked})}
                   label="Trim Lines"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -172,7 +172,7 @@ And some punctuation!!!
 
                 <PixelCheckbox
                   checked={options.removeExtraSpaces}
-                  onChange={(checked) => setOptions({...options, removeExtraSpaces: checked})}
+                  onChange={(e) => setOptions({...options, removeExtraSpaces: e.target.checked})}
                   label="Remove Extra Spaces"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -181,7 +181,7 @@ And some punctuation!!!
 
                 <PixelCheckbox
                   checked={options.removeEmptyLines}
-                  onChange={(checked) => setOptions({...options, removeEmptyLines: checked})}
+                  onChange={(e) => setOptions({...options, removeEmptyLines: e.target.checked})}
                   label="Remove Empty Lines"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -190,7 +190,7 @@ And some punctuation!!!
 
                 <PixelCheckbox
                   checked={options.removeDuplicateLines}
-                  onChange={(checked) => setOptions({...options, removeDuplicateLines: checked})}
+                  onChange={(e) => setOptions({...options, removeDuplicateLines: e.target.checked})}
                   label="Remove Duplicate Lines"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -199,7 +199,7 @@ And some punctuation!!!
 
                 <PixelCheckbox
                   checked={options.removePunctuation}
-                  onChange={(checked) => setOptions({...options, removePunctuation: checked})}
+                  onChange={(e) => setOptions({...options, removePunctuation: e.target.checked})}
                   label="Remove Punctuation"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -208,7 +208,7 @@ And some punctuation!!!
 
                 <PixelCheckbox
                   checked={options.addLineNumbers}
-                  onChange={(checked) => setOptions({...options, addLineNumbers: checked})}
+                  onChange={(e) => setOptions({...options, addLineNumbers: e.target.checked})}
                   label="Add Line Numbers"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
