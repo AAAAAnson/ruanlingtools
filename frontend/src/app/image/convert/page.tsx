@@ -76,7 +76,7 @@ export default function ImageConvertPage() {
         formData.append('height', height);
       }
 
-      const response = await fetch(`${API_BASE}/api/image/convert`, {
+      const response = await fetch(`${API_BASE}/image/convert`, {
         method: 'POST',
         body: formData,
       });
@@ -99,7 +99,7 @@ export default function ImageConvertPage() {
   };
 
   const handleDownload = (filename: string) => {
-    const downloadUrl = `${API_BASE}/api/image/download/${filename}`;
+    const downloadUrl = `${API_BASE}/image/download/${filename}`;
     window.open(downloadUrl, '_blank');
   };
 
@@ -109,7 +109,7 @@ export default function ImageConvertPage() {
     try {
       const filenames = results.map(r => r.converted_filename);
 
-      const response = await fetch(`${API_BASE}/api/image/download-zip`, {
+      const response = await fetch(`${API_BASE}/image/download-zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
