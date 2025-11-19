@@ -292,7 +292,7 @@ export default function ImageConvertPage() {
                 <div>
                   <PixelCheckbox
                     checked={enableResize}
-                    onChange={setEnableResize}
+                    onChange={(e) => setEnableResize(e.target.checked)}
                     label="Enable Resize"
                   />
                 </div>
