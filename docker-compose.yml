@@ -49,7 +49,7 @@ services:
     networks:
       - toolbox-network
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "node"]
+      test: ["CMD", "test", "-f", "/app/server.js"]
       interval: 30s
       timeout: 10s
       retries: 3
