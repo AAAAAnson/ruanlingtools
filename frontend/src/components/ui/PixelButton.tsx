@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { buttonAnimations } from '@/lib/animations';
 
 interface PixelButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onDragStart' | 'onDragEnd' | 'onDrag'> {
-  children: ReactNode;
+  children?: ReactNode;  // Made optional for icon-only buttons
   variant?: 'primary' | 'secondary' | 'success' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
@@ -40,7 +40,7 @@ export function PixelButton({
         <Loader2 className="w-4 h-4 animate-spin inline-block" />
       ) : (
         <>
-          {icon && <span className="inline-block mr-2">{icon}</span>}
+          {icon && <span className={`inline-block ${children ? 'mr-2' : ''}`}>{icon}</span>}
           {children}
         </>
       )}
