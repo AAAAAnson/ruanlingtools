@@ -13,6 +13,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link
+          rel="preconnect"
+          href="https://fonts.loli.net"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.loli.net/css2?family=Press+Start+2P&family=Roboto:wght@300;400;500;700&display=swap"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
