@@ -1,6 +1,6 @@
 'use client';
 
-import { Image, FileText, File, Wand2, Youtube, TrendingUp, ArrowRight, Sparkles } from 'lucide-react';
+import { Image, FileText, File, Wand2, Youtube, ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
@@ -149,18 +149,6 @@ export default function HomePage() {
               })}
             </div>
           </div>
-        </section>
-
-        {/* Recent Usage */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="font-pixel text-2xl md:text-3xl text-center mb-12 text-accent">
-            Recent Activity
-          </h2>
-          <PixelCard className="text-center py-16">
-            <TrendingUp className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-            <p className="font-pixel text-sm text-gray-500 mb-2">No recent activity</p>
-            <p className="text-xs text-gray-600">Start using tools to see your activity here</p>
-          </PixelCard>
         </section>
 
         {/* Features */}
