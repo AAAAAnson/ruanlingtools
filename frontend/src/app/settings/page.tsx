@@ -8,7 +8,6 @@ import { PixelInput } from '@/components/ui/PixelInput';
 import { PixelLoading } from '@/components/ui/PixelLoading';
 import { PixelTextarea } from '@/components/ui/PixelTextarea';
 import { Settings as SettingsIcon, Key, Save, Trash2, Plus, CheckCircle, XCircle, Youtube } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface APIKeyStatus {
   configured: boolean;
@@ -145,11 +144,7 @@ export default function SettingsPage() {
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div>
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -309,7 +304,7 @@ export default function SettingsPage() {
               </p>
             </div>
           </PixelCard>
-        </motion.div>
+        </div>
       </div>
     </MainLayout>
   );

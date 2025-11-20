@@ -11,7 +11,6 @@ import {
   Info
 } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
 const pdfTools = [
   {
@@ -68,36 +67,28 @@ export default function PDFToolsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {pdfTools.map((tool, index) => {
+          {pdfTools.map((tool) => {
             const Icon = tool.icon;
             return (
               <Link key={tool.id} href={tool.path}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02 }}
-                  className="h-full"
+                <PixelCard
+                  className="h-full cursor-pointer hover:border-pixel-primary transition-colors"
                 >
-                  <PixelCard
-                    className="h-full cursor-pointer hover:border-pixel-primary transition-colors"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div
-                        className="p-3 rounded pixel-border"
-                        style={{ backgroundColor: `${tool.color}20` }}
-                      >
-                        <Icon size={24} style={{ color: tool.color }} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-pixel mb-2">{tool.name}</h3>
-                        <p className="text-sm text-pixel-text-secondary">
-                          {tool.description}
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="p-3 rounded pixel-border"
+                      style={{ backgroundColor: `${tool.color}20` }}
+                    >
+                      <Icon size={24} style={{ color: tool.color }} />
                     </div>
-                  </PixelCard>
-                </motion.div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-pixel mb-2">{tool.name}</h3>
+                      <p className="text-sm text-pixel-text-secondary">
+                        {tool.description}
+                      </p>
+                    </div>
+                  </div>
+                </PixelCard>
               </Link>
             );
           })}

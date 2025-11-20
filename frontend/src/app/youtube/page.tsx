@@ -140,11 +140,7 @@ export default function YouTubePage() {
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div>
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -335,11 +331,7 @@ export default function YouTubePage() {
 
           {/* Results */}
           {results && results.total_channels > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
+            <div>
               {/* Stats Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <PixelCard hoverable={false}>
@@ -448,10 +440,11 @@ export default function YouTubePage() {
                         {/* Latest Videos (Expandable) */}
                         {selectedChannel?.channel_id === channel.channel_id && channel.latest_videos.length > 0 && (
                           <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mt-4 pt-4 border-t-2 border-gray-700"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            className="mt-4 pt-4 border-t-2 border-gray-700 overflow-hidden"
                           >
                             <h4 className="font-pixel text-sm text-primary mb-3">Latest Videos</h4>
                             <div className="space-y-2">
@@ -503,9 +496,9 @@ export default function YouTubePage() {
                   </PixelCard>
                 ))}
               </div>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </MainLayout>
   );
