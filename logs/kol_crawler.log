@@ -1,0 +1,12 @@
+2025-11-20 10:58:54,002 - __main__ - INFO - YouTube KOL Crawler started
+2025-11-20 10:58:54,006 - googleapiclient.discovery_cache - INFO - file_cache is only supported with oauth2client<4.0.0
+2025-11-20 10:58:54,009 - __main__ - INFO - Using API key #0 (***t1j3EQ)
+2025-11-20 10:58:54,046 - langid.langid - INFO - initializing identifier
+2025-11-20 10:59:26,209 - __main__ - INFO - YouTube KOL Crawler started
+2025-11-20 10:59:26,213 - googleapiclient.discovery_cache - INFO - file_cache is only supported with oauth2client<4.0.0
+2025-11-20 10:59:26,218 - __main__ - INFO - Using API key #0 (***t1j3EQ)
+2025-11-20 10:59:26,237 - langid.langid - INFO - initializing identifier
+2025-11-20 10:59:58,283 - __main__ - INFO - YouTube KOL Crawler started
+2025-11-20 10:59:58,287 - googleapiclient.discovery_cache - INFO - file_cache is only supported with oauth2client<4.0.0
+2025-11-20 10:59:58,290 - __main__ - INFO - Using API key #0 (***t1j3EQ)
+2025-11-20 10:59:58,307 - langid.langid - INFO - initializing identifier

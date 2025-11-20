@@ -1,0 +1,40 @@
+# YouTube KOL Crawler - 完整依赖列表
+# 更新日期：2024-12-19
+
+# Google API
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+
+# 数据库
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+
+# 数据处理
+pandas>=2.0.0
+openpyxl>=3.1.0
+numpy>=1.24.0
+
+# 语言检测
+emoji>=2.8.0
+langid>=1.1.6
+langdetect>=1.0.9
+
+# 工具库
+python-dotenv>=1.0.0
+pytz>=2023.3
+tenacity>=8.2.0
+jump-consistent-hash>=3.2.0
+
+# HTTP请求
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# 命令行和显示
+colorama>=0.4.6
+tqdm>=4.66.0
+
+# 可选：翻译功能
+# googletrans==4.0.0-rc1

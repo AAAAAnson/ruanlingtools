@@ -1,324 +1,348 @@
-# Soft Collar Toolbox 2.0 🎨
+# YouTube KOL Crawler System - 完整使用指南
 
-像素风格的多功能工具平台 - 隐私优先、简单高效
+## 🎯 系统概述
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
-![Docker](https://img.shields.io/badge/docker-required-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+YouTube KOL Crawler 是一个专业的YouTube数据采集和分析系统，用于：
+- 基于关键词批量抓取YouTube视频数据
+- 汇总和分析频道（KOL）信息
+- 生成详细的数据报告和分析
+- 支持多API Key轮换和并行处理
 
----
+## 📋 功能特性
 
-## ✨ 功能特性
+### 核心功能
+- ✅ **全时间窗视频抓取** - 支持任意时间范围的视频采集
+- ✅ **智能API管理** - 多Key轮换、配额管理、错误恢复
+- ✅ **数据持久化** - SQLite/MySQL数据库存储
+- ✅ **进度可视化** - PowerShell ASCII进度条显示
+- ✅ **断点续传** - 错误队列管理，支持失败重试
 
-### 📸 图片处理工具
-- **格式转换**: JPG ↔ PNG ↔ WebP
-- 批量处理、实时预览
-
-### 📝 文本处理工具（5个）
-- **大小写转换器**: 11种转换类型
-- **文本格式化器**: 去重、排序、添加行号
-- **编码器/解码器**: Base64、URL、HTML、Hex、Binary
-- **文本排序器**: 4种排序方式
-- **文本统计**: 8项指标实时统计
-
-### 📄 PDF 处理工具（4个）
-- **PDF 合并**: 多文件合并，可调整顺序
-- **PDF 拆分**: 灵活的页码范围语法
-- **文本提取**: 提取所有页面文本
-- **PDF 信息**: 查看元数据和属性
-
-### 🎯 设计特色
-- 🎮 **8-bit 像素艺术风格** - 复古游戏美学
-- 🔒 **隐私优先** - 文本工具全部浏览器端处理
-- 🚀 **快速响应** - 优化的性能和用户体验
-- 📱 **响应式设计** - 支持各种屏幕尺寸
-
----
+### 增强功能
+- ✅ **成本预估** - 采集前预估API消耗
+- ✅ **并行分片** - 支持多机并行处理
+- ✅ **语言检测** - 自动识别视频语言
+- ✅ **国家识别** - 智能推断频道所属国家
+- ✅ **数据导出** - Excel/CSV/JSON多格式导出
+- ✅ **分析报告** - 自动生成统计分析报告
 
 ## 🚀 快速开始
 
-### Windows 用户
+### 1. 系统要求
+- Windows 10/11 或 Windows Server
+- Python 3.8 或更高版本
+- 至少 1GB 可用磁盘空间
+- 稳定的网络连接
 
-**方式 1: PowerShell（推荐）**
+### 2. 安装步骤
+
+#### 步骤 1: 克隆或下载项目
 ```powershell
-git clone https://github.com/yourusername/ruanlingtools.git
-cd ruanlingtools
-Copy-Item .env.example .env
-.\deploy.ps1 deploy
+# 进入项目目录
+cd D:\yt-kol-crawler\YouTube
 ```
 
-**方式 2: 批处理**
-```cmd
-git clone https://github.com/yourusername/ruanlingtools.git
-cd ruanlingtools
+#### 步骤 2: 安装Python依赖
+```powershell
+# 创建虚拟环境（推荐）
+python -m venv venv
+
+# 激活虚拟环境
+.\venv\Scripts\Activate.ps1
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+#### 步骤 3: 配置API密钥
+
+1. 复制配置模板：
+```powershell
 copy .env.example .env
-deploy.bat deploy
 ```
 
-📖 **详细指南**: [DEPLOYMENT_WINDOWS.md](DEPLOYMENT_WINDOWS.md)
-
-### Linux / macOS 用户
-
-```bash
-git clone https://github.com/yourusername/ruanlingtools.git
-cd ruanlingtools
-cp .env.example .env
-chmod +x deploy.sh
-./deploy.sh deploy
+2. 编辑 `.env` 文件，添加您的YouTube API密钥：
+```env
+YOUTUBE_API_KEYS=AIzaSyXXXXXXXXXXXXXXXXXX,AIzaSyYYYYYYYYYYYYYYYYYY
 ```
 
-📖 **详细指南**: [DEPLOYMENT.md](DEPLOYMENT.md)
+> ⚠️ **重要**: 您需要先在 [Google Cloud Console](https://console.cloud.google.com/) 创建项目并启用 YouTube Data API v3
 
-### 访问应用
+### 3. 获取YouTube API密钥
 
-部署成功后，访问：
-- 🌐 **应用主页**: http://localhost:8888
-- 📚 **API 文档**: http://localhost:8888/docs
+#### 详细步骤：
+1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
+2. 创建新项目或选择现有项目
+3. 启用 YouTube Data API v3:
+   - 导航到 "API和服务" → "库"
+   - 搜索 "YouTube Data API v3"
+   - 点击启用
+4. 创建API密钥:
+   - 导航到 "API和服务" → "凭据"
+   - 点击 "创建凭据" → "API密钥"
+   - 限制密钥（推荐）：
+     - API限制：仅限YouTube Data API v3
+     - 应用限制：IP地址（添加您的IP）
+5. 复制密钥到 `.env` 文件
 
----
+## 📖 详细使用教程
 
-## 📋 系统要求
+### 基础用法
 
-| 组件 | 要求 |
-|------|------|
-| **Docker** | 20.10.0+ |
-| **Docker Compose** | 2.0.0+ |
-| **CPU** | 2核心（推荐4核心） |
-| **内存** | 2GB（推荐4GB） |
-| **存储** | 10GB 可用空间 |
+#### 1. 爬取单个关键词（使用批处理文件）
+```powershell
+# 最简单的方式 - 使用批处理文件
+.\run_crawler.bat "AI technology"
 
-### Windows 特殊要求
-- Windows 10/11 64位
-- 启用虚拟化（VT-x/AMD-V）
-- Docker Desktop for Windows
+# 指定起始年份
+.\run_crawler.bat "machine learning" --start-year 2023
 
----
-
-## 🛠️ 技术栈
-
-### 前端
-- **框架**: Next.js 14 (App Router)
-- **语言**: TypeScript (严格模式)
-- **样式**: Tailwind CSS
-- **动画**: Framer Motion
-- **图标**: Lucide React
-
-### 后端
-- **框架**: FastAPI
-- **语言**: Python 3.11+
-- **图片处理**: Pillow
-- **PDF处理**: PyPDF2
-- **验证**: Pydantic
-
-### 基础设施
-- **容器化**: Docker + Docker Compose
-- **反向代理**: Nginx
-- **编码标准**: UTF-8 强制规范
-
----
-
-## 📂 项目结构
-
-```
-ruanlingtools/
-├── frontend/               # Next.js 前端应用
-│   ├── src/
-│   │   ├── app/           # 页面路由
-│   │   │   ├── image/     # 图片工具
-│   │   │   ├── text/      # 文本工具
-│   │   │   └── pdf/       # PDF工具
-│   │   └── components/    # 像素风格组件
-│   └── Dockerfile         # 前端镜像（多阶段构建）
-│
-├── backend/               # FastAPI 后端应用
-│   ├── routers/          # API 路由
-│   ├── services/         # 业务逻辑
-│   ├── models/           # 数据模型
-│   └── Dockerfile        # 后端镜像（多阶段构建）
-│
-├── nginx/                # Nginx 配置
-│   ├── nginx.conf       # 主配置
-│   └── conf.d/          # 站点配置
-│
-├── docker-compose.yml   # 容器编排
-├── .env.example         # 环境变量模板
-│
-├── deploy.sh            # Linux/macOS 部署脚本
-├── deploy.ps1           # Windows PowerShell 脚本
-├── deploy.bat           # Windows 批处理脚本
-│
-├── DEPLOYMENT.md        # Linux/macOS 部署文档
-└── DEPLOYMENT_WINDOWS.md # Windows 部署文档
+# 限制结果数量
+.\run_crawler.bat "deep learning" --max-results 1000
 ```
 
----
+#### 2. 使用PowerShell脚本（高级进度显示）
+```powershell
+# 单个关键词
+.\run_crawler.ps1 -Keywords "AI technology"
 
-## 🎮 管理命令
+# 多个关键词
+.\run_crawler.ps1 -Keywords "AI technology","machine learning","deep learning"
 
-### Linux / macOS
+# 指定时间范围
+.\run_crawler.ps1 -Keywords "ChatGPT" -StartYear 2023 -EndDate "2024-12-31"
 
-```bash
-./deploy.sh deploy    # 部署应用
-./deploy.sh start     # 启动服务
-./deploy.sh stop      # 停止服务
-./deploy.sh restart   # 重启服务
-./deploy.sh status    # 查看状态
-./deploy.sh logs      # 查看日志
-./deploy.sh health    # 健康检查
-./deploy.sh update    # 更新应用
-./deploy.sh clean     # 清理容器
+# 限制结果数量
+.\run_crawler.ps1 -Keywords "GPT-4" -MaxResults 500
 ```
 
-### Windows PowerShell
+#### 3. 直接使用Python（最大灵活性）
+```powershell
+# 基础爬取
+python main.py "AI technology"
+
+# 指定完整时间范围
+python main.py "machine learning" --start-date "2023-01-01" --end-date "2024-12-31"
+
+# 多个关键词
+python main.py "AI" "ML" "DL" --start-year 2023
+
+# 仅估算成本
+python main.py "large dataset" --estimate-only
+```
+
+### 高级功能
+
+#### 1. API状态管理
+```powershell
+# 查看API密钥状态
+python main.py --status
+
+# 重置每日配额（太平洋时间午夜自动重置）
+python main.py --reset-quota
+
+# 处理失败队列
+python main.py --process-queue
+```
+
+#### 2. 并行处理（多机分片）
+
+在多台机器上并行运行：
+
+**机器1:**
+```powershell
+.\run_crawler.ps1 -Keywords "AI","ML","DL","NLP" -ShardId 0 -ShardCount 2
+```
+
+**机器2:**
+```powershell
+.\run_crawler.ps1 -Keywords "AI","ML","DL","NLP" -ShardId 1 -ShardCount 2
+```
+
+#### 3. 数据分析和报告
 
 ```powershell
-.\deploy.ps1 deploy   # 部署应用
-.\deploy.ps1 start    # 启动服务
-.\deploy.ps1 stop     # 停止服务
-.\deploy.ps1 status   # 查看状态
-.\deploy.ps1 logs     # 查看日志
-.\deploy.ps1 health   # 健康检查
+# 分析特定关键词
+python analyzer.py keyword "AI technology"
+
+# 分析特定频道
+python analyzer.py channel "UCdKG2JnYDzJO8swEcNomKnw"
+
+# 生成综合报告
+python analyzer.py report
+
+# 导出数据到Excel
+python analyzer.py export --keyword "AI technology" --format excel
+
+# 导出所有数据
+python analyzer.py export --format csv
 ```
 
-### Windows 批处理
+## 📊 数据库结构
 
-```cmd
-deploy.bat deploy     # 部署应用
-deploy.bat start      # 启动服务
-deploy.bat stop       # 停止服务
-deploy.bat status     # 查看状态
-deploy.bat logs       # 查看日志
-```
+系统使用SQLite数据库（默认）或MySQL，包含以下主要表：
 
----
+### videos 表
+- `video_id` - YouTube视频ID
+- `keyword` - 搜索关键词
+- `title` - 视频标题
+- `published_at` - 发布时间
+- `channel_id` - 频道ID
+- `view_count` - 观看次数
+- `like_count` - 点赞数
+- `comment_count` - 评论数
+
+### channels 表
+- `channel_id` - 频道ID
+- `title` - 频道名称
+- `custom_url` - 自定义URL
+- `country` - 国家/地区
+- `subscriber_count` - 订阅者数
+- `video_count` - 视频总数
+- `view_count` - 总观看次数
 
 ## 🔧 配置说明
 
-### 环境变量 (.env)
+### 环境变量配置 (.env文件)
 
 ```env
-# 端口配置
-NGINX_PORT=8888
+# YouTube API配置
+YOUTUBE_API_KEYS=key1,key2,key3  # 多个Key用逗号分隔
+PER_KEY_BUDGET=9800               # 每个Key的每日配额限制
 
-# API 地址（前端调用后端）
-NEXT_PUBLIC_API_URL=http://localhost:8888/api
+# 数据库配置
+DB_TYPE=sqlite                    # 或 mysql
+DB_PATH=./data/youtube_kol.db     # SQLite数据库路径
 
-# CORS 配置
-CORS_ORIGINS=http://localhost:8888
+# MySQL配置（可选）
+# DB_HOST=localhost
+# DB_PORT=3306
+# DB_USER=root
+# DB_PASSWORD=password
+# DB_NAME=youtube_kol
 
-# 调试模式（生产环境设为 False）
-DEBUG=False
+# 分片配置
+SHARD_ID=0                        # 当前分片ID
+SHARD_COUNT=1                     # 总分片数
+
+# 显示配置
+KOL_NO_EMOJI=0                    # 1=禁用emoji显示
+
+# 采样配置
+SAMPLE_SIZE=100                   # 成本估算采样大小
+AUTO_EXPAND_KEYS=0                # 1=自动扩容API Key
 ```
 
-### 不同场景配置
+## 📈 使用场景示例
 
-**本地开发：**
-```env
-NGINX_PORT=8888
-NEXT_PUBLIC_API_URL=http://localhost:8888/api
-DEBUG=True
+### 场景1: 研究AI技术趋势
+```powershell
+# 1. 爬取2023-2024年的AI相关视频
+.\run_crawler.ps1 -Keywords "artificial intelligence","AI technology","machine learning" -StartYear 2023
+
+# 2. 分析数据
+python analyzer.py keyword "artificial intelligence"
+
+# 3. 导出报告
+python analyzer.py export --keyword "artificial intelligence" --format excel
 ```
 
-**内网部署：**
-```env
-NGINX_PORT=8888
-NEXT_PUBLIC_API_URL=http://192.168.1.100:8888/api
-CORS_ORIGINS=http://192.168.1.100:8888
+### 场景2: 竞品分析
+```powershell
+# 1. 爬取竞品相关内容
+python main.py "competitor product name" --start-year 2024
+
+# 2. 分析top频道
+python analyzer.py keyword "competitor product name"
+
+# 3. 导出频道列表
+python analyzer.py export --keyword "competitor product name"
 ```
 
-**Synology NAS：**
-```env
-NGINX_PORT=8888
-NEXT_PUBLIC_API_URL=https://yourdomain.synology.me/toolbox/api
-CORS_ORIGINS=https://yourdomain.synology.me
+### 场景3: KOL发现
+```powershell
+# 1. 爬取行业关键词
+.\run_crawler.bat "your industry keyword" --start-year 2023
+
+# 2. 生成报告查看top KOL
+python analyzer.py report
+
+# 3. 深入分析特定KOL
+python analyzer.py channel "CHANNEL_ID_HERE"
 ```
 
----
+## ⚠️ 注意事项
 
-## 🏗️ 开发路线图
+### API配额管理
+- 每个Google账号每天有10,000单位的免费配额
+- Search操作消耗100单位/次
+- Videos和Channels操作消耗1单位/次
+- 建议准备3-5个API Key以确保充足配额
 
-- [x] **P0**: 框架搭建和基础组件
-- [x] **P1**: 图片格式转换工具
-- [x] **P2**: 文本处理工具套件（5个工具）
-- [x] **P3**: PDF 处理工具套件（4个工具）
-- [x] **P4**: 部署优化和文档完善
-- [ ] **P5**: 更多工具和功能扩展
-
----
-
-## 📖 文档
-
-- [Linux/macOS 部署指南](DEPLOYMENT.md) - 详细的 Linux 和 macOS 部署文档
-- [Windows 部署指南](DEPLOYMENT_WINDOWS.md) - Windows 专用部署说明
-- [API 文档](http://localhost:8888/docs) - 部署后可访问的交互式 API 文档
-
----
-
-## 🐛 故障排除
+### 最佳实践
+1. **先估算成本**: 使用 `--estimate-only` 预估API消耗
+2. **分批处理**: 对大量关键词分批次处理
+3. **定期备份**: 定期备份SQLite数据库文件
+4. **监控进度**: 使用PowerShell脚本查看实时进度
+5. **错误恢复**: 定期运行 `--process-queue` 处理失败任务
 
 ### 常见问题
 
-**1. 端口被占用**
-```bash
-# Linux/macOS
-sudo lsof -i :8888
+**Q: API Key配额用完了怎么办？**
+A: 系统会自动切换到下一个可用的Key。所有Key都用完后会停止并保存进度，第二天配额重置后可继续。
 
-# Windows
-netstat -ano | findstr :8888
-```
-解决：修改 `.env` 中的 `NGINX_PORT`
+**Q: 如何提高爬取速度？**
+A: 
+1. 增加更多API Key
+2. 使用多机并行（分片功能）
+3. 优化时间窗口大小
 
-**2. Docker 未启动**
-- Linux: `sudo systemctl start docker`
-- Windows: 启动 Docker Desktop
+**Q: 数据库太大怎么办？**
+A: 
+1. 定期导出历史数据
+2. 使用MySQL替代SQLite
+3. 实施数据归档策略
 
-**3. 权限错误**
-- Linux: `sudo usermod -aG docker $USER`
-- Windows: 以管理员身份运行
+**Q: 爬虫中断了怎么办？**
+A: 系统支持断点续传，直接重新运行相同命令即可从中断处继续。
 
-更多问题请查看详细部署文档。
+## 🛠️ 故障排除
 
----
+### 问题1: Python未找到
+**解决方案:**
+1. 确认Python已安装: `python --version`
+2. 添加Python到PATH环境变量
+3. 重启PowerShell/命令提示符
 
-## 🤝 贡献
+### 问题2: API错误 403
+**可能原因:**
+- API Key无效或被禁用
+- 未启用YouTube Data API v3
+- IP限制不匹配
 
-欢迎贡献代码、报告问题或提出建议！
+**解决方案:**
+1. 检查Google Cloud Console中的API状态
+2. 重新生成API Key
+3. 检查API Key限制设置
 
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+### 问题3: 数据库锁定错误
+**解决方案:**
+1. 确保没有其他进程访问数据库
+2. 删除 `.db-journal` 文件（如果存在）
+3. 考虑切换到MySQL
 
----
+## 📞 支持与帮助
+
+如遇到问题，请检查：
+1. 日志文件: `./logs/kol_crawler.log`
+2. 错误队列: 运行 `python main.py --status` 查看
+3. API配额: 在Google Cloud Console查看使用情况
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+本项目仅供学习和研究使用，请遵守YouTube服务条款和API使用政策。
 
 ---
 
-## 🌟 特别感谢
+**开发者备注**: 系统已完整实现所有核心和增强功能，可直接投入使用。建议从小规模测试开始，逐步扩大爬取范围。
 
-- [Next.js](https://nextjs.org/) - React 框架
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代 Python Web 框架
-- [Docker](https://www.docker.com/) - 容器化平台
-- [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
-- 所有开源贡献者
-
----
-
-## 📞 联系方式
-
-- GitHub Issues: [提交问题](https://github.com/yourusername/ruanlingtools/issues)
-- Email: your.email@example.com
-
----
-
-<div align="center">
-
-**用像素艺术打造的现代工具箱** 🎨
-
-Made with ❤️ and pixels
-
-</div>
+祝您使用愉快！🚀
