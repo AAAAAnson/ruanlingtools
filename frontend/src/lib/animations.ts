@@ -17,13 +17,13 @@ export const buttonAnimations = {
 };
 
 export const pageTransitions: Variants = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 1, y: 0 },  // Changed: start visible to prevent blank page
   animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
 };
 
 export const fadeAnimations: Variants = {
-  initial: { opacity: 0 },
+  initial: { opacity: 1 },  // Changed: start visible
   animate: { opacity: 1, transition: { duration: 0.3 } },
   exit: { opacity: 0, transition: { duration: 0.2 } },
 };
@@ -52,7 +52,7 @@ export const slideAnimations = {
 };
 
 export const scaleAnimations: Variants = {
-  initial: { scale: 0.8, opacity: 0 },
+  initial: { scale: 1, opacity: 1 },  // Changed: start visible
   animate: { scale: 1, opacity: 1, transition: { duration: 0.3 } },
   exit: { scale: 0.8, opacity: 0, transition: { duration: 0.2 } },
 };
@@ -63,7 +63,7 @@ export const cardHoverAnimation = {
 };
 
 export const listContainerAnimation: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 1 },  // Changed: start visible
   show: {
     opacity: 1,
     transition: { staggerChildren: 0.1 },
@@ -71,7 +71,7 @@ export const listContainerAnimation: Variants = {
 };
 
 export const listItemAnimation: Variants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 1, y: 0 },  // Changed: start visible
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
