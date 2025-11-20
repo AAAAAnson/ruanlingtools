@@ -5,7 +5,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { PixelTextarea } from '@/components/ui/PixelTextarea';
-import { FileText, Upload, Copy, Check, Download } from 'lucide-react';
+import { FileText, Upload, Copy, Check, Download, X } from 'lucide-react';
 
 export default function PDFExtractTextPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -91,156 +91,205 @@ export default function PDFExtractTextPage() {
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-pixel mb-4 text-pixel-primary flex items-center gap-3">
+          <h1 className="text-4xl font-pixel mb-4 text-gradient flex items-center gap-3">
             <FileText size={32} />
             Extract Text from PDF
           </h1>
-          <p className="text-pixel-text-secondary">
-            Extract all text content from PDF files. Great for copying text from scanned documents or PDFs.
+          <p className="text-gray-300">
+            Extract all text content from PDF files for copying, editing, or further processing
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <PixelCard title="Upload PDF File">
-              <div className="space-y-4">
-                <label className="pixel-border block p-8 text-center cursor-pointer hover:bg-pixel-bg-secondary transition-colors">
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <Upload className="mx-auto mb-3 text-pixel-text-secondary" size={48} />
-                  <p className="text-lg mb-2">Click to upload PDF file</p>
-                  <p className="text-sm text-pixel-text-secondary">
-                    or drag and drop a file here
-                  </p>
-                </label>
-
-                {file && (
-                  <div className="pixel-border p-4 bg-pixel-bg flex items-center gap-3">
-                    <FileText className="text-pixel-primary" size={24} />
-                    <div className="flex-1">
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-sm text-pixel-text-secondary">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="pixel-border p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <PixelButton
-                    onClick={handleExtract}
-                    disabled={!file || extracting}
-                  >
-                    {extracting ? 'Extracting...' : 'Extract Text'}
-                  </PixelButton>
-                  {file && (
-                    <PixelButton variant="secondary" onClick={handleReset}>
-                      Reset
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Content - 3 columns */}
+          <div className="lg:col-span-3">
+            {/* Single Unified Card */}
+            <PixelCard hoverable={false}>
+              {/* Header */}
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-pixel text-lg text-primary flex items-center gap-2">
+                  <Upload size={20} />
+                  Text Extractor
+                  {file && <span className="text-sm text-gray-400">(1 file)</span>}
+                </h2>
+                {extractedText && (
+                  <div className="flex gap-2">
+                    <PixelButton
+                      size="sm"
+                      icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                      onClick={handleCopy}
+                    >
+                      {copied ? 'Copied' : 'Copy Text'}
                     </PixelButton>
-                  )}
-                </div>
+                    <PixelButton
+                      size="sm"
+                      icon={<Download size={14} />}
+                      onClick={handleDownloadText}
+                    >
+                      Download TXT
+                    </PixelButton>
+                  </div>
+                )}
+              </div>
+
+              {/* Unified Upload & Content Area */}
+              <div>
+                {!file ? (
+                  /* Upload Area - Empty State */
+                  <label className="border-2 border-dashed border-[#333344] rounded-lg block p-8 text-center cursor-pointer hover:border-[#4ECDC4]/50 transition-colors">
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <Upload className="mx-auto mb-3 text-gray-400" size={48} />
+                    <p className="text-lg mb-2">Click to upload PDF file</p>
+                    <p className="text-sm text-gray-400">
+                      or drag and drop a file here
+                    </p>
+                  </label>
+                ) : (
+                  <>
+                    {/* File Info & Results */}
+                    <div className="border-2 border-dashed border-[#4ECDC4]/30 rounded-lg p-4 bg-[#0F0F1E]/50">
+                      {/* File Display */}
+                      <div className="border-2 border-[#333344] p-3 bg-[#1A1A2E] rounded mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <FileText className="text-[#4ECDC4]" size={24} />
+                          <div>
+                            <p className="font-medium text-sm">{file.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {(file.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <PixelButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={handleReset}
+                        >
+                          Change File
+                        </PixelButton>
+                      </div>
+
+                      {/* Error Display */}
+                      {error && (
+                        <div className="border-2 border-red-500/30 p-3 bg-red-900/20 rounded text-red-400 mb-4 text-sm">
+                          {error}
+                        </div>
+                      )}
+
+                      {/* Extracted Text Results */}
+                      {extractedText && (
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs text-gray-400">
+                              Extracted {textLength.toLocaleString()} characters
+                            </p>
+                            <p className="text-xs text-[#4ECDC4]">
+                              Text is editable
+                            </p>
+                          </div>
+                          <PixelTextarea
+                            value={extractedText}
+                            onChange={(e) => setExtractedText(e.target.value)}
+                            rows={20}
+                            className="w-full font-mono text-sm"
+                            placeholder="Extracted text will appear here..."
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Extract Button */}
+                    {!extractedText && (
+                      <div className="mt-4">
+                        <PixelButton
+                          icon={<FileText size={16} />}
+                          onClick={handleExtract}
+                          disabled={extracting}
+                          loading={extracting}
+                          className="w-full"
+                        >
+                          {extracting ? 'Extracting Text...' : 'Extract Text from PDF'}
+                        </PixelButton>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </PixelCard>
-
-            {extractedText && (
-              <PixelCard title="Extracted Text">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-pixel-text-secondary">
-                      {textLength.toLocaleString()} characters extracted
-                    </p>
-                    <div className="flex gap-2">
-                      <PixelButton size="sm" onClick={handleCopy}>
-                        {copied ? (
-                          <>
-                            <Check size={14} />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={14} />
-                            Copy
-                          </>
-                        )}
-                      </PixelButton>
-                      <PixelButton size="sm" onClick={handleDownloadText}>
-                        <Download size={14} />
-                        Download
-                      </PixelButton>
-                    </div>
-                  </div>
-
-                  <PixelTextarea
-                    value={extractedText}
-                    onChange={(e) => setExtractedText(e.target.value)}
-                    rows={20}
-                    className="w-full font-mono text-sm"
-                    placeholder="Extracted text will appear here..."
-                  />
-                </div>
-              </PixelCard>
-            )}
           </div>
 
+          {/* Sidebar - 1 column */}
           <div className="space-y-6">
-            <PixelCard title="How to Use">
-              <div className="space-y-2 text-sm text-pixel-text-secondary">
+            <PixelCard hoverable={false}>
+              <div className="mb-3">
+                <h3 className="font-pixel text-sm text-primary">How to Use</h3>
+              </div>
+              <div className="space-y-2 text-sm text-gray-400">
                 <p>1. Upload a PDF file</p>
                 <p>2. Click "Extract Text" to process</p>
-                <p>3. View, copy, or download the extracted text</p>
-                <p>4. Edit the text directly if needed</p>
+                <p>3. View and edit the extracted text</p>
+                <p>4. Copy to clipboard or download as TXT</p>
+                <div className="pt-2 border-t border-[#333344] mt-3">
+                  <p className="text-xs">
+                    Tip: The extracted text is editable before copying or downloading
+                  </p>
+                </div>
               </div>
             </PixelCard>
 
-            <PixelCard title="Features">
+            <PixelCard hoverable={false}>
+              <div className="mb-3">
+                <h3 className="font-pixel text-sm text-primary">Features</h3>
+              </div>
               <div className="space-y-3 text-sm">
                 <div>
                   <h4 className="font-medium mb-1">Page-by-Page</h4>
-                  <p className="text-pixel-text-secondary text-xs">
+                  <p className="text-gray-400 text-xs">
                     Text is extracted from all pages with page markers
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium mb-1">Editable Output</h4>
-                  <p className="text-pixel-text-secondary text-xs">
-                    You can edit the extracted text before copying or downloading
+                  <p className="text-gray-400 text-xs">
+                    Edit the extracted text before copying or downloading
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium mb-1">Multiple Formats</h4>
-                  <p className="text-pixel-text-secondary text-xs">
+                  <p className="text-gray-400 text-xs">
                     Copy to clipboard or download as a .txt file
                   </p>
                 </div>
               </div>
             </PixelCard>
 
-            <PixelCard title="Notes">
-              <div className="space-y-2 text-sm text-pixel-text-secondary">
-                <p>• Works best with text-based PDFs</p>
-                <p>• Scanned PDFs may not contain extractable text</p>
-                <p>• Formatting may not be preserved</p>
-                <p>• Tables and complex layouts may appear differently</p>
+            <PixelCard hoverable={false}>
+              <div className="mb-3">
+                <h3 className="font-pixel text-sm text-primary">Use Cases</h3>
               </div>
-            </PixelCard>
-
-            <PixelCard title="Use Cases">
-              <div className="space-y-2 text-sm text-pixel-text-secondary">
+              <div className="space-y-2 text-sm text-gray-400">
                 <p>• Copy text from PDF documents</p>
                 <p>• Convert PDFs to plain text</p>
                 <p>• Extract content for further processing</p>
                 <p>• Get text for translation or analysis</p>
+              </div>
+            </PixelCard>
+
+            <PixelCard hoverable={false}>
+              <div className="mb-3">
+                <h3 className="font-pixel text-sm text-primary">Notes</h3>
+              </div>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>• Works best with text-based PDFs</p>
+                <p>• Scanned PDFs may not contain extractable text</p>
+                <p>• Formatting may not be preserved</p>
+                <p>• Tables and complex layouts may appear differently</p>
               </div>
             </PixelCard>
           </div>

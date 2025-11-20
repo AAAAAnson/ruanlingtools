@@ -10,7 +10,7 @@ import { PixelSlider } from '@/components/ui/PixelSlider';
 import { PixelInput } from '@/components/ui/PixelInput';
 import { PixelProgress } from '@/components/ui/PixelProgress';
 import { PixelCheckbox } from '@/components/ui/PixelCheckbox';
-import { Download, Image as ImageIcon, FileImage, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Download, Image as ImageIcon, FileImage, CheckCircle, XCircle, Trash2, Eye, X, Upload, Loader2 } from 'lucide-react';
 
 interface ConversionResult {
   original_filename: string;
@@ -29,41 +29,84 @@ interface ConversionResponse {
   errors?: Array<{ filename: string; error: string }>;
 }
 
+// 统一的文件项接口
+interface FileItem {
+  id: string;
+  file: File;
+  preview: string;
+  status: 'pending' | 'converting' | 'success' | 'error';
+  progress?: number;
+  result?: ConversionResult;
+  error?: string;
+}
+
 export default function ImageConvertPage() {
-  const [files, setFiles] = useState<File[]>([]);
+  // 使用统一的 FileItem 数组管理所有文件状态
+  const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [outputFormat, setOutputFormat] = useState('png');
   const [quality, setQuality] = useState(85);
   const [enableResize, setEnableResize] = useState(false);
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
   const [isConverting, setIsConverting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState<ConversionResult[]>([]);
-  const [errors, setErrors] = useState<Array<{ filename: string; error: string }>>([]);
+  const [compareView, setCompareView] = useState<{ original: string; converted: string; filename: string } | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   const handleFilesSelected = (selectedFiles: File[]) => {
-    setFiles(selectedFiles);
-    setResults([]);
-    setErrors([]);
+    // 为每个新文件创建 FileItem
+    const newItems: FileItem[] = [];
+    let loadedCount = 0;
+
+    selectedFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newItems.push({
+          id: `${file.name}-${Date.now()}-${Math.random()}`,
+          file,
+          preview: reader.result as string,
+          status: 'pending'
+        });
+        loadedCount++;
+
+        if (loadedCount === selectedFiles.length) {
+          // 追加到现有列表
+          setFileItems(prev => [...prev, ...newItems]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleConvert = async () => {
-    if (files.length === 0) {
+    // 找出所有待转换的文件
+    const pendingItems = fileItems.filter(item => item.status === 'pending');
+    if (pendingItems.length === 0) {
       return;
     }
 
     setIsConverting(true);
-    setProgress(0);
-    setResults([]);
-    setErrors([]);
+
+    // 将待转换的文件状态更新为 converting
+    setFileItems(prev => prev.map(item =>
+      item.status === 'pending'
+        ? { ...item, status: 'converting' as const, progress: 0 }
+        : item
+    ));
 
     try {
       const formData = new FormData();
 
-      files.forEach(file => {
-        formData.append('files', file);
+      pendingItems.forEach(item => {
+        formData.append('files', item.file);
       });
 
       formData.append('output_format', outputFormat);
@@ -76,40 +119,91 @@ export default function ImageConvertPage() {
         formData.append('height', height);
       }
 
-      const response = await fetch(`${API_BASE}/api/image/convert`, {
+      // 模拟进度更新
+      const progressInterval = setInterval(() => {
+        setFileItems(prev => prev.map(item =>
+          item.status === 'converting'
+            ? { ...item, progress: Math.min((item.progress || 0) + 15, 90) }
+            : item
+        ));
+      }, 300);
+
+      const response = await fetch(`${API_BASE}/image/convert`, {
         method: 'POST',
         body: formData,
       });
 
+      clearInterval(progressInterval);
       const data = await response.json();
 
       if (data.code === 200 && data.data) {
         const conversionData = data.data as ConversionResponse;
-        setResults(conversionData.results || []);
-        setErrors(conversionData.errors || []);
-        setProgress(100);
+
+        // 更新每个文件的状态
+        setFileItems(prev => prev.map(item => {
+          if (item.status !== 'converting') return item;
+
+          // 查找对应的结果
+          const result = conversionData.results?.find(r => r.original_filename === item.file.name);
+          if (result) {
+            return {
+              ...item,
+              status: 'success' as const,
+              progress: 100,
+              result
+            };
+          }
+
+          // 查找对应的错误
+          const error = conversionData.errors?.find(e => e.filename === item.file.name);
+          if (error) {
+            return {
+              ...item,
+              status: 'error' as const,
+              error: error.error
+            };
+          }
+
+          // 如果没有结果也没有错误，标记为错误
+          return {
+            ...item,
+            status: 'error' as const,
+            error: 'Conversion failed'
+          };
+        }));
       } else {
-        setErrors([{ filename: 'All files', error: data.message || 'Conversion failed' }]);
+        // 全部标记为失败
+        setFileItems(prev => prev.map(item =>
+          item.status === 'converting'
+            ? { ...item, status: 'error' as const, error: data.message || 'Conversion failed' }
+            : item
+        ));
       }
     } catch (error) {
-      setErrors([{ filename: 'System', error: error instanceof Error ? error.message : 'Unknown error' }]);
+      // 全部标记为失败
+      setFileItems(prev => prev.map(item =>
+        item.status === 'converting'
+          ? { ...item, status: 'error' as const, error: error instanceof Error ? error.message : 'Unknown error' }
+          : item
+      ));
     } finally {
       setIsConverting(false);
     }
   };
 
   const handleDownload = (filename: string) => {
-    const downloadUrl = `${API_BASE}/api/image/download/${filename}`;
+    const downloadUrl = `${API_BASE}/image/download/${filename}`;
     window.open(downloadUrl, '_blank');
   };
 
   const handleDownloadAll = async () => {
-    if (results.length === 0) return;
+    const successItems = fileItems.filter(item => item.status === 'success' && item.result);
+    if (successItems.length === 0) return;
 
     try {
-      const filenames = results.map(r => r.converted_filename);
+      const filenames = successItems.map(item => item.result!.converted_filename);
 
-      const response = await fetch(`${API_BASE}/api/image/download-zip`, {
+      const response = await fetch(`${API_BASE}/image/download-zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,128 +228,265 @@ export default function ImageConvertPage() {
   };
 
   const handleClear = () => {
-    setFiles([]);
-    setResults([]);
-    setErrors([]);
-    setProgress(0);
+    setFileItems([]);
   };
+
+  const handleRemoveFile = (id: string) => {
+    setFileItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handlePreview = (item: FileItem) => {
+    if (!item.result) return;
+
+    const convertedUrl = `${API_BASE}/image/download/${item.result.converted_filename}`;
+
+    setCompareView({
+      original: item.preview,
+      converted: convertedUrl,
+      filename: item.file.name
+    });
+  };
+
+  const pendingCount = fileItems.filter(item => item.status === 'pending').length;
+  const convertingCount = fileItems.filter(item => item.status === 'converting').length;
+  const successCount = fileItems.filter(item => item.status === 'success').length;
+  const errorCount = fileItems.filter(item => item.status === 'error').length;
 
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-pixel mb-4 text-pixel-primary">Image Format Converter</h1>
-          <p className="text-pixel-text-secondary">
-            Convert images between JPG, PNG, and WebP formats with batch processing support
+          <h1 className="text-4xl font-pixel mb-4 text-gradient">Image Format Converter</h1>
+          <p className="text-gray-300">
+            Upload images, configure settings, and convert to your desired format
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <PixelCard title="Upload Images">
-              <PixelUpload
-                multiple={true}
-                accept="image/*"
-                maxSizeMB={10}
-                onFilesSelected={handleFilesSelected}
-              />
-              {files.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm text-pixel-text-secondary mb-2">
-                    Selected: {files.length} file(s)
-                  </p>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Content - 3 columns */}
+          <div className="lg:col-span-3">
+            {/* Single Unified Card */}
+            <PixelCard hoverable={false}>
+              {/* Header with Actions */}
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-pixel text-lg text-primary flex items-center gap-2">
+                  <Upload size={20} />
+                  Image Converter
+                  {fileItems.length > 0 && <span className="text-sm text-gray-400">({fileItems.length})</span>}
+                </h2>
+                {fileItems.length > 0 && (
                   <div className="flex gap-2">
-                    <PixelButton onClick={handleConvert} disabled={isConverting} loading={isConverting}>
-                      Convert Images
-                    </PixelButton>
-                    <PixelButton variant="secondary" onClick={handleClear}>
-                      <Trash2 size={16} />
-                      Clear
-                    </PixelButton>
-                  </div>
-                </div>
-              )}
-            </PixelCard>
-
-            {isConverting && (
-              <PixelCard title="Converting...">
-                <PixelProgress value={progress} max={100} />
-                <p className="text-sm text-pixel-text-secondary mt-2">
-                  Processing {files.length} image(s)...
-                </p>
-              </PixelCard>
-            )}
-
-            {results.length > 0 && (
-              <PixelCard
-                title={`Conversion Results (${results.length})`}
-              >
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-pixel-text-secondary">
-                      Successfully converted {results.length} image(s)
-                    </p>
-                    <PixelButton size="sm" onClick={handleDownloadAll}>
-                      <Download size={16} />
-                      Download All
-                    </PixelButton>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {results.map((result, index) => (
-                      <div
-                        key={index}
-                        className="pixel-border p-4 bg-pixel-background-light"
+                    {successCount > 0 && (
+                      <PixelButton
+                        size="sm"
+                        icon={<Download size={14} />}
+                        onClick={handleDownloadAll}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" title={result.original_filename}>
-                              {result.original_filename}
-                            </p>
-                            <p className="text-xs text-pixel-text-secondary mt-1">
-                              {result.size_mb} MB - {result.output_format.toUpperCase()}
-                            </p>
-                          </div>
-                          <PixelButton
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleDownload(result.converted_filename)}
-                          >
-                            <Download size={14} />
-                          </PixelButton>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PixelCard>
-            )}
-
-            {errors.length > 0 && (
-              <PixelCard
-                title={`Errors (${errors.length})`}
-              >
-                <div className="space-y-2">
-                  {errors.map((error, index) => (
-                    <div
-                      key={index}
-                      className="pixel-border p-3 bg-red-50 dark:bg-red-900/20"
+                        Download All ({successCount})
+                      </PixelButton>
+                    )}
+                    <PixelButton
+                      size="sm"
+                      variant="secondary"
+                      icon={<Trash2 size={14} />}
+                      onClick={handleClear}
+                      disabled={isConverting}
                     >
-                      <p className="text-sm font-medium text-red-700 dark:text-red-400">
-                        {error.filename}
-                      </p>
-                      <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                        {error.error}
-                      </p>
+                      Clear All
+                    </PixelButton>
+                  </div>
+                )}
+              </div>
+
+              {/* Unified Upload & File List Area */}
+              <div>
+                {/* 如果没有文件，显示大的上传区域 */}
+                {fileItems.length === 0 ? (
+                  <PixelUpload
+                    multiple={true}
+                    accept="image/*"
+                    maxSizeMB={10}
+                    onFilesSelected={handleFilesSelected}
+                  />
+                ) : (
+                  <>
+                    {/* File List with integrated upload */}
+                    <div className="border-2 border-dashed border-[#4ECDC4]/30 rounded-lg p-4 bg-[#0F0F1E]/50">
+                      {/* Statistics */}
+                      <div className="flex gap-4 mb-4 text-xs">
+                        {pendingCount > 0 && (
+                          <span className="text-gray-400">Pending: {pendingCount}</span>
+                        )}
+                        {convertingCount > 0 && (
+                          <span className="text-yellow-400">Converting: {convertingCount}</span>
+                        )}
+                        {successCount > 0 && (
+                          <span className="text-green-400">Success: {successCount}</span>
+                        )}
+                        {errorCount > 0 && (
+                          <span className="text-red-400">Failed: {errorCount}</span>
+                        )}
+                      </div>
+
+                      {/* File Items */}
+                      <div className="space-y-2 mb-4">
+                        {fileItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="border-2 border-[#333344] p-3 bg-[#1A1A2E] rounded hover:border-[#4ECDC4]/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              {/* Thumbnail */}
+                              <div className="flex-shrink-0 w-7 h-7 rounded border border-[#333344] overflow-hidden bg-black/30">
+                                <img
+                                  src={item.preview}
+                                  alt={item.file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+
+                              {/* File Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={item.file.name}>
+                                  {item.file.name}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span>{formatFileSize(item.file.size)}</span>
+                                  {item.result && (
+                                    <>
+                                      <span>→</span>
+                                      <span className="text-[#4ECDC4]">
+                                        {formatFileSize(item.result.size)} ({item.result.output_format.toUpperCase()})
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Status Indicator */}
+                              <div className="flex-shrink-0 min-w-[100px]">
+                                {item.status === 'pending' && (
+                                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                    Ready
+                                  </span>
+                                )}
+                                {item.status === 'converting' && (
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 size={14} className="animate-spin text-yellow-400" />
+                                    <span className="text-xs text-yellow-400">{item.progress || 0}%</span>
+                                  </div>
+                                )}
+                                {item.status === 'success' && (
+                                  <span className="text-xs text-green-400 flex items-center gap-1">
+                                    <CheckCircle size={14} />
+                                    Complete
+                                  </span>
+                                )}
+                                {item.status === 'error' && (
+                                  <span className="text-xs text-red-400 flex items-center gap-1" title={item.error}>
+                                    <XCircle size={14} />
+                                    Failed
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex gap-1 flex-shrink-0">
+                                {item.status === 'success' && item.result && (
+                                  <>
+                                    <PixelButton
+                                      size="sm"
+                                      variant="secondary"
+                                      icon={<Eye size={12} />}
+                                      onClick={() => handlePreview(item)}
+                                      title="Preview"
+                                    />
+                                    <PixelButton
+                                      size="sm"
+                                      icon={<Download size={12} />}
+                                      onClick={() => handleDownload(item.result!.converted_filename)}
+                                      title="Download"
+                                    />
+                                  </>
+                                )}
+                                {(item.status === 'pending' || item.status === 'error') && (
+                                  <PixelButton
+                                    size="sm"
+                                    variant="danger"
+                                    icon={<X size={12} />}
+                                    onClick={() => handleRemoveFile(item.id)}
+                                    disabled={isConverting}
+                                    title="Remove"
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {item.error && (
+                              <div className="mt-2 text-xs text-red-300 bg-red-900/20 p-2 rounded border border-red-500/30">
+                                {item.error}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Compact Upload Area - 继续添加文件 */}
+                      <div className="border-2 border-dashed border-[#333344] rounded p-3 text-center hover:border-[#4ECDC4]/50 transition-colors cursor-pointer">
+                        <label className="cursor-pointer block">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 0) {
+                                handleFilesSelected(files);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                            <Upload size={16} />
+                            <span>Click to add more images or drop them here</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </PixelCard>
-            )}
+
+                    {/* Convert Button */}
+                    {pendingCount > 0 && (
+                      <div className="mt-4">
+                        <PixelButton
+                          icon={<ImageIcon size={16} />}
+                          onClick={handleConvert}
+                          disabled={isConverting}
+                          loading={isConverting}
+                          className="w-full"
+                        >
+                          Convert {pendingCount} Image{pendingCount > 1 ? 's' : ''}
+                        </PixelButton>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </PixelCard>
           </div>
 
+          {/* Settings Sidebar - 1 column */}
           <div className="space-y-6">
-            <PixelCard title="Conversion Settings">
+            <PixelCard hoverable={false}>
+              <div className="mb-4">
+                <h2 className="font-pixel text-sm text-primary flex items-center gap-2">
+                  <ImageIcon size={16} />
+                  Settings
+                </h2>
+              </div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
@@ -282,12 +513,12 @@ export default function ImageConvertPage() {
                     min={1}
                     max={100}
                   />
-                  <p className="text-xs text-pixel-text-secondary mt-1">
+                  <p className="text-xs text-gray-400 mt-1">
                     Higher quality = larger file size
                   </p>
                 </div>
 
-                <div>
+                <div className="pt-3 border-t border-[#333344]">
                   <PixelCheckbox
                     checked={enableResize}
                     onChange={(e) => setEnableResize(e.target.checked)}
@@ -296,7 +527,7 @@ export default function ImageConvertPage() {
                 </div>
 
                 {enableResize && (
-                  <div className="space-y-3 pl-6 border-l-2 border-pixel-primary/30">
+                  <div className="space-y-3 pl-4 border-l-2 border-[#4ECDC4]/30">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Width (px)
@@ -321,7 +552,7 @@ export default function ImageConvertPage() {
                       />
                     </div>
 
-                    <p className="text-xs text-pixel-text-secondary">
+                    <p className="text-xs text-gray-400">
                       Leave empty to maintain aspect ratio
                     </p>
                   </div>
@@ -329,23 +560,17 @@ export default function ImageConvertPage() {
               </div>
             </PixelCard>
 
-            <PixelCard title="Supported Formats">
-              <div className="space-y-2 text-sm">
+            <PixelCard hoverable={false}>
+              <div className="space-y-3 text-sm">
                 <div>
-                  <p className="font-medium mb-1">Input formats:</p>
-                  <p className="text-pixel-text-secondary">
+                  <p className="font-medium text-gray-300 mb-1">Supported Formats:</p>
+                  <p className="text-gray-400 text-xs">
                     JPG, PNG, WebP, GIF, BMP
                   </p>
                 </div>
-                <div>
-                  <p className="font-medium mb-1">Output formats:</p>
-                  <p className="text-pixel-text-secondary">
-                    JPG, PNG, WebP
-                  </p>
-                </div>
-                <div className="pt-2 border-t border-pixel-border">
-                  <p className="text-xs text-pixel-text-secondary">
-                    Maximum file size: 10 MB per image
+                <div className="pt-2 border-t border-[#333344]">
+                  <p className="text-xs text-gray-400">
+                    Max file size: 10 MB per image
                   </p>
                 </div>
               </div>
@@ -353,6 +578,35 @@ export default function ImageConvertPage() {
           </div>
         </div>
       </div>
+
+      {/* Compare View Modal */}
+      {compareView && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setCompareView(null)}>
+          <div className="max-w-6xl w-full bg-[#1A1A2E] border-2 border-[#4ECDC4] rounded p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-pixel text-lg text-[#4ECDC4]">Before & After Comparison</h3>
+              <button onClick={() => setCompareView(null)} className="text-gray-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-4">{compareView.filename}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-2 text-center">Original</p>
+                <div className="border-2 border-[#333344] rounded overflow-hidden bg-[#0F0F1E]">
+                  <img src={compareView.original} alt="Original" className="w-full h-auto" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-2 text-center">Converted ({outputFormat.toUpperCase()})</p>
+                <div className="border-2 border-[#4ECDC4] rounded overflow-hidden bg-[#0F0F1E]">
+                  <img src={compareView.converted} alt="Converted" className="w-full h-auto" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }
