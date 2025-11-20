@@ -1,11 +1,11 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, MotionProps } from 'framer-motion';
 import { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { buttonAnimations } from '@/lib/animations';
 
-interface PixelButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface PixelButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onDragStart' | 'onDragEnd' | 'onDrag'> {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'success' | 'danger';
   size?: 'sm' | 'md' | 'lg';
