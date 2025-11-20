@@ -52,10 +52,13 @@ ENV NODE_ENV=production \
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy necessary files
-COPY --from=builder /app/public ./public
+# Copy necessary files in correct order
+# First copy the standalone output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Then copy static files (overwrites any from standalone)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Finally copy public folder
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Switch to non-root user
 USER nextjs
