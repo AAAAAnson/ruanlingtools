@@ -1,11 +1,9 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Image, FileText, File, Wand2, Youtube, TrendingUp, ArrowRight, Sparkles } from 'lucide-react';
+import { Image, FileText, File, Wand2, Youtube, ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
-import { pageTransitions, listContainerAnimation, listItemAnimation } from '@/lib/animations';
 
 const toolCategories = [
   {
@@ -67,26 +65,16 @@ const stats = [
 export default function HomePage() {
   return (
     <MainLayout>
-      <motion.div
-        variants={pageTransitions}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="min-h-screen"
-      >
+      <div className="min-h-screen">
         {/* Hero Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="text-center">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div>
               <h1 className="font-pixel text-3xl md:text-5xl mb-6 text-gradient">
                 Soft Collar Toolbox
               </h1>
               <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Your all-in-one pixel art themed toolbox for image processing, 
+                Your all-in-one pixel art themed toolbox for image processing,
                 PDF manipulation, and text formatting
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -102,16 +90,11 @@ export default function HomePage() {
                   </button>
                 </Link>
               </div>
-            </motion.div>
+            </div>
           </div>
 
           {/* Stats */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
             {stats.map((stat, index) => (
               <PixelCard key={index} className="text-center">
                 <div className="font-pixel text-3xl mb-2" style={{ color: stat.color }}>
@@ -120,30 +103,21 @@ export default function HomePage() {
                 <div className="text-sm text-gray-400">{stat.label}</div>
               </PixelCard>
             ))}
-          </motion.div>
+          </div>
         </section>
 
         {/* Tool Categories */}
         <section id="tools" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
+          <div>
             <h2 className="font-pixel text-2xl md:text-3xl text-center mb-12 text-secondary">
               Available Tools
             </h2>
 
-            <motion.div
-              variants={listContainerAnimation}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {toolCategories.map((category, index) => {
                 const Icon = category.icon;
                 return (
-                  <motion.div key={index} variants={listItemAnimation}>
+                  <div key={index}>
                     <Link href={category.href}>
                       <PixelCard className="h-full hover:border-primary cursor-pointer">
                         <div className="flex items-start gap-4 mb-4">
@@ -170,23 +144,11 @@ export default function HomePage() {
                         </div>
                       </PixelCard>
                     </Link>
-                  </motion.div>
+                  </div>
                 );
               })}
-            </motion.div>
-          </motion.div>
-        </section>
-
-        {/* Recent Usage */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="font-pixel text-2xl md:text-3xl text-center mb-12 text-accent">
-            Recent Activity
-          </h2>
-          <PixelCard className="text-center py-16">
-            <TrendingUp className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-            <p className="font-pixel text-sm text-gray-500 mb-2">No recent activity</p>
-            <p className="text-xs text-gray-600">Start using tools to see your activity here</p>
-          </PixelCard>
+            </div>
+          </div>
         </section>
 
         {/* Features */}
@@ -212,7 +174,7 @@ export default function HomePage() {
             </PixelCard>
           </div>
         </section>
-      </motion.div>
+      </div>
     </MainLayout>
   );
 }
