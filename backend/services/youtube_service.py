@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-YouTube KOL Search Service
+YouTube KOL Search Service with Multi-Key Support
 
-Simplified version for web integration
+Supports multiple API keys with automatic rotation on quota exhaustion
 """
 import os
 import logging
@@ -16,20 +16,79 @@ logger = logging.getLogger(__name__)
 
 
 class YouTubeService:
-    """YouTube API service for KOL search"""
+    """YouTube API service for KOL search with multi-key support"""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_keys: Optional[List[str]] = None):
         """
         Initialize YouTube service
 
         Args:
-            api_key: YouTube Data API key
+            api_keys: List of YouTube Data API keys (optional, will load from settings)
         """
-        self.api_key = api_key or os.getenv('YOUTUBE_API_KEY')
-        if not self.api_key:
-            raise ValueError("YouTube API key not provided")
+        # Import here to avoid circular dependency
+        from services.settings_service import get_settings_service
 
-        self.youtube = build('youtube', 'v3', developerKey=self.api_key)
+        if api_keys:
+            self.api_keys = api_keys
+        else:
+            # Load from settings service
+            settings_service = get_settings_service()
+            self.api_keys = settings_service.get_youtube_keys()
+
+        if not self.api_keys:
+            raise ValueError("No YouTube API keys configured")
+
+        self.current_key_index = 0
+        self.youtube = self._build_service()
+        logger.info(f"YouTube service initialized with {len(self.api_keys)} API key(s)")
+
+    def _build_service(self):
+        """Build YouTube service with current API key"""
+        if self.current_key_index >= len(self.api_keys):
+            raise Exception("All API keys exhausted")
+
+        current_key = self.api_keys[self.current_key_index]
+        logger.info(f"Using API key #{self.current_key_index + 1} (***{current_key[-6:]})")
+        return build('youtube', 'v3', developerKey=current_key)
+
+    def _switch_key(self):
+        """Switch to next available API key"""
+        self.current_key_index += 1
+
+        if self.current_key_index >= len(self.api_keys):
+            logger.warning("All API keys exhausted")
+            raise Exception("All API keys have been exhausted. Please try again later or add more keys.")
+
+        self.youtube = self._build_service()
+        logger.info(f"Switched to API key #{self.current_key_index + 1}")
+
+    def _execute_with_retry(self, request):
+        """Execute API request with automatic key rotation on quota errors"""
+        max_retries = len(self.api_keys)
+        attempts = 0
+
+        while attempts < max_retries:
+            try:
+                return request.execute()
+            except HttpError as e:
+                error_reason = e.error_details[0].get('reason', '') if e.error_details else ''
+
+                # Check if quota exceeded
+                if error_reason in ['quotaExceeded', 'dailyLimitExceeded']:
+                    logger.warning(f"API key #{self.current_key_index + 1} quota exceeded")
+                    attempts += 1
+
+                    if attempts < max_retries:
+                        # Try next key
+                        self._switch_key()
+                        # Rebuild the request with new service
+                        # Note: Caller needs to handle request rebuild
+                        raise Exception("QUOTA_EXCEEDED_RETRY")
+                    else:
+                        raise Exception("All API keys quota exceeded")
+                else:
+                    # Other HTTP errors
+                    raise
 
     def parse_iso8601_duration(self, duration_str: str) -> int:
         """
@@ -105,15 +164,26 @@ class YouTubeService:
         try:
             logger.info(f"Searching KOLs for keyword: {keyword}")
 
-            # Step 1: Search for videos
-            search_response = self.youtube.search().list(
-                q=keyword,
-                part='id,snippet',
-                type='video',
-                maxResults=min(max_results, 50),
-                order='relevance',
-                relevanceLanguage='en'
-            ).execute()
+            # Step 1: Search for videos with retry logic
+            retry_count = 0
+            max_retries = len(self.api_keys)
+
+            while retry_count < max_retries:
+                try:
+                    search_response = self.youtube.search().list(
+                        q=keyword,
+                        part='id,snippet',
+                        type='video',
+                        maxResults=min(max_results, 50),
+                        order='relevance',
+                        relevanceLanguage='en'
+                    ).execute()
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    if str(e) == "QUOTA_EXCEEDED_RETRY":
+                        retry_count += 1
+                        continue
+                    raise
 
             if not search_response.get('items'):
                 return {
@@ -135,10 +205,19 @@ class YouTubeService:
             # Step 3: Get video details (for engagement data)
             videos_data = {}
             if video_ids:
-                videos_response = self.youtube.videos().list(
-                    id=','.join(video_ids),
-                    part='statistics,contentDetails,snippet'
-                ).execute()
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        videos_response = self.youtube.videos().list(
+                            id=','.join(video_ids),
+                            part='statistics,contentDetails,snippet'
+                        ).execute()
+                        break
+                    except Exception as e:
+                        if str(e) == "QUOTA_EXCEEDED_RETRY":
+                            retry_count += 1
+                            continue
+                        raise
 
                 for video in videos_response.get('items', []):
                     duration_seconds = self.parse_iso8601_duration(
@@ -189,10 +268,19 @@ class YouTubeService:
             kol_results = []
 
             if channels_list:
-                channels_response = self.youtube.channels().list(
-                    id=','.join(channels_list),
-                    part='snippet,statistics,brandingSettings'
-                ).execute()
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        channels_response = self.youtube.channels().list(
+                            id=','.join(channels_list),
+                            part='snippet,statistics,brandingSettings'
+                        ).execute()
+                        break
+                    except Exception as e:
+                        if str(e) == "QUOTA_EXCEEDED_RETRY":
+                            retry_count += 1
+                            continue
+                        raise
 
                 for channel in channels_response.get('items', []):
                     channel_id = channel['id']
@@ -247,7 +335,8 @@ class YouTubeService:
                 'channels': kol_results,
                 'total_channels': len(kol_results),
                 'total_videos': sum(c['keyword_videos_count'] for c in kol_results),
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'api_key_used': f"#{self.current_key_index + 1} of {len(self.api_keys)}"
             }
 
         except HttpError as e:
@@ -269,10 +358,21 @@ class YouTubeService:
             Dictionary containing channel information
         """
         try:
-            response = self.youtube.channels().list(
-                id=channel_id,
-                part='snippet,statistics,brandingSettings,contentDetails'
-            ).execute()
+            retry_count = 0
+            max_retries = len(self.api_keys)
+
+            while retry_count < max_retries:
+                try:
+                    response = self.youtube.channels().list(
+                        id=channel_id,
+                        part='snippet,statistics,brandingSettings,contentDetails'
+                    ).execute()
+                    break
+                except Exception as e:
+                    if str(e) == "QUOTA_EXCEEDED_RETRY":
+                        retry_count += 1
+                        continue
+                    raise
 
             if not response.get('items'):
                 raise Exception(f"Channel not found: {channel_id}")

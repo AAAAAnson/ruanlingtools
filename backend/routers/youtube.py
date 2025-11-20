@@ -78,16 +78,14 @@ async def search_kols(request: KOLSearchRequest):
         HTTPException: If API key is not configured or API error occurs
     """
     try:
-        # Check if API key is configured
-        api_key = os.getenv('YOUTUBE_API_KEY')
-        if not api_key:
+        # Initialize YouTube service (will load keys from settings)
+        try:
+            youtube_service = YouTubeService()
+        except ValueError as e:
             return ApiResponse.error(
-                message="YouTube API key not configured. Please contact administrator.",
+                message="YouTube API key not configured. Please configure in Settings.",
                 code=503
             )
-
-        # Initialize YouTube service
-        youtube_service = YouTubeService(api_key=api_key)
 
         # Search for KOLs
         results = await youtube_service.search_kols(
@@ -130,16 +128,14 @@ async def get_channel_info(channel_id: str):
         HTTPException: If API key is not configured or channel not found
     """
     try:
-        # Check if API key is configured
-        api_key = os.getenv('YOUTUBE_API_KEY')
-        if not api_key:
+        # Initialize YouTube service (will load keys from settings)
+        try:
+            youtube_service = YouTubeService()
+        except ValueError as e:
             return ApiResponse.error(
-                message="YouTube API key not configured. Please contact administrator.",
+                message="YouTube API key not configured. Please configure in Settings.",
                 code=503
             )
-
-        # Initialize YouTube service
-        youtube_service = YouTubeService(api_key=api_key)
 
         # Get channel information
         channel_info = await youtube_service.get_channel_info(channel_id)
