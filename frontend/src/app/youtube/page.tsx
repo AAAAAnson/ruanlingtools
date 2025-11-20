@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { PixelInput } from '@/components/ui/PixelInput';
+import { PixelCheckbox } from '@/components/ui/PixelCheckbox';
 import { PixelLoading } from '@/components/ui/PixelLoading';
-import { Search, Youtube, Users, Eye, ThumbsUp, MessageSquare, ExternalLink, TrendingUp } from 'lucide-react';
+import { Search, Youtube, Users, Eye, ThumbsUp, MessageSquare, ExternalLink, TrendingUp, Settings as SettingsIcon, Download, Database, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Video {
@@ -48,6 +50,7 @@ interface SearchResults {
 }
 
 export default function YouTubePage() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [minSubscribers, setMinSubscribers] = useState('10000');
   const [maxResults, setMaxResults] = useState('20');
@@ -55,6 +58,10 @@ export default function YouTubePage() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [error, setError] = useState('');
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+
+  // Analysis options
+  const [analysisMode, setAnalysisMode] = useState<'full' | 'db-only'>('full');
+  const [getLatestVideos, setGetLatestVideos] = useState(true);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -79,6 +86,8 @@ export default function YouTubePage() {
           keyword: keyword.trim(),
           max_results: parseInt(maxResults) || 20,
           min_subscribers: parseInt(minSubscribers) || 10000,
+          db_only: analysisMode === 'db-only',
+          get_latest_videos: getLatestVideos,
         }),
       });
 
@@ -98,6 +107,21 @@ export default function YouTubePage() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleExport = () => {
+    if (!results) return;
+
+    const dataStr = JSON.stringify(results, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kol-search-${results.keyword}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -126,6 +150,14 @@ export default function YouTubePage() {
             <div className="flex items-center justify-center gap-3 mb-4">
               <Youtube className="w-12 h-12 text-primary" />
               <h1 className="font-pixel text-3xl text-primary">YouTube KOL Search</h1>
+              <PixelButton
+                onClick={() => router.push('/settings')}
+                variant="secondary"
+                size="sm"
+                icon={<SettingsIcon className="w-4 h-4" />}
+              >
+                Settings
+              </PixelButton>
             </div>
             <p className="text-gray-400 font-body">
               Discover influential YouTube channels and analyze their performance
@@ -134,7 +166,7 @@ export default function YouTubePage() {
 
           {/* Search Form */}
           <PixelCard className="mb-8">
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <label className="block text-sm font-pixel mb-2 text-gray-300">
                   Search Keyword
@@ -179,15 +211,112 @@ export default function YouTubePage() {
                 </div>
               </div>
 
-              <PixelButton
-                onClick={handleSearch}
-                loading={isSearching}
-                icon={<Search className="w-4 h-4" />}
-                className="w-full"
-                size="lg"
-              >
-                Search KOLs
-              </PixelButton>
+              {/* Analysis Mode */}
+              <div className="border-t-2 border-gray-700 pt-4">
+                <label className="block text-sm font-pixel mb-3 text-gray-300">
+                  🎯 Analysis Mode
+                </label>
+                <div className="space-y-3">
+                  <div
+                    onClick={() => setAnalysisMode('full')}
+                    className={`p-4 rounded pixel-border border-2 cursor-pointer transition-all ${
+                      analysisMode === 'full'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-gray-700 bg-dark/50 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Zap className={`w-5 h-5 ${analysisMode === 'full' ? 'text-primary' : 'text-gray-500'}`} />
+                      <div className="flex-grow">
+                        <p className={`font-pixel text-sm ${analysisMode === 'full' ? 'text-primary' : 'text-gray-300'}`}>
+                          Full Analysis
+                        </p>
+                        <p className="text-xs text-gray-500 font-body mt-1">
+                          Crawl fresh data from YouTube (consumes API quota)
+                        </p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        analysisMode === 'full'
+                          ? 'border-primary bg-primary'
+                          : 'border-gray-600'
+                      }`}>
+                        {analysisMode === 'full' && (
+                          <div className="w-full h-full rounded-full bg-white scale-50"></div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setAnalysisMode('db-only')}
+                    className={`p-4 rounded pixel-border border-2 cursor-pointer transition-all ${
+                      analysisMode === 'db-only'
+                        ? 'border-secondary bg-secondary/10'
+                        : 'border-gray-700 bg-dark/50 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Database className={`w-5 h-5 ${analysisMode === 'db-only' ? 'text-secondary' : 'text-gray-500'}`} />
+                      <div className="flex-grow">
+                        <p className={`font-pixel text-sm ${analysisMode === 'db-only' ? 'text-secondary' : 'text-gray-300'}`}>
+                          Database Only
+                        </p>
+                        <p className="text-xs text-gray-500 font-body mt-1">
+                          Fast analysis using cached data (no API consumption)
+                        </p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        analysisMode === 'db-only'
+                          ? 'border-secondary bg-secondary'
+                          : 'border-gray-600'
+                      }`}>
+                        {analysisMode === 'db-only' && (
+                          <div className="w-full h-full rounded-full bg-white scale-50"></div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Options */}
+              <div className="border-t-2 border-gray-700 pt-4">
+                <label className="block text-sm font-pixel mb-3 text-gray-300">
+                  ⚙️ Advanced Options
+                </label>
+                <div className="p-4 rounded pixel-border border-2 border-gray-700 bg-dark/50">
+                  <PixelCheckbox
+                    checked={getLatestVideos}
+                    onChange={(e) => setGetLatestVideos(e.target.checked)}
+                    label="Fetch latest 10 videos for each channel (requires API quota)"
+                  />
+                  <p className="text-xs text-gray-500 font-body mt-2 ml-6">
+                    💡 Recommended for fresh performance metrics, but uses more API quota
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <PixelButton
+                  onClick={handleSearch}
+                  loading={isSearching}
+                  icon={<Search className="w-4 h-4" />}
+                  className="flex-grow"
+                  size="lg"
+                >
+                  {analysisMode === 'db-only' ? 'Analyze from Database' : 'Start Analysis'}
+                </PixelButton>
+                {results && (
+                  <PixelButton
+                    onClick={handleExport}
+                    variant="success"
+                    icon={<Download className="w-4 h-4" />}
+                    size="lg"
+                  >
+                    Export
+                  </PixelButton>
+                )}
+              </div>
 
               {error && (
                 <div className="p-4 bg-danger/20 border-2 border-danger text-danger rounded pixel-border">
