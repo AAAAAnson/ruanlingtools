@@ -189,7 +189,6 @@ export default function ImageConvertPage() {
             {results.length > 0 && (
               <PixelCard
                 title={`Conversion Results (${results.length})`}
-                icon={<CheckCircle size={20} />}
               >
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -235,7 +234,6 @@ export default function ImageConvertPage() {
             {errors.length > 0 && (
               <PixelCard
                 title={`Errors (${errors.length})`}
-                icon={<XCircle size={20} />}
               >
                 <div className="space-y-2">
                   {errors.map((error, index) => (
