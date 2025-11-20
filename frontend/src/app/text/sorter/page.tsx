@@ -208,7 +208,7 @@ Item 5`);
               <div className="space-y-3">
                 <PixelCheckbox
                   checked={options.reverse}
-                  onChange={(checked) => setOptions({...options, reverse: checked})}
+                  onChange={(e) => setOptions({...options, reverse: e.target.checked})}
                   label="Reverse Order"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -219,7 +219,7 @@ Item 5`);
                   <>
                     <PixelCheckbox
                       checked={options.caseSensitive}
-                      onChange={(checked) => setOptions({...options, caseSensitive: checked})}
+                      onChange={(e) => setOptions({...options, caseSensitive: e.target.checked})}
                       label="Case Sensitive"
                     />
                     <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -230,7 +230,7 @@ Item 5`);
 
                 <PixelCheckbox
                   checked={options.removeEmptyLines}
-                  onChange={(checked) => setOptions({...options, removeEmptyLines: checked})}
+                  onChange={(e) => setOptions({...options, removeEmptyLines: e.target.checked})}
                   label="Remove Empty Lines"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
@@ -239,7 +239,7 @@ Item 5`);
 
                 <PixelCheckbox
                   checked={options.removeDuplicates}
-                  onChange={(checked) => setOptions({...options, removeDuplicates: checked})}
+                  onChange={(e) => setOptions({...options, removeDuplicates: e.target.checked})}
                   label="Remove Duplicates"
                 />
                 <p className="text-xs text-pixel-text-secondary ml-6 -mt-2">
