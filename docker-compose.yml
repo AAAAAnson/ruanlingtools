@@ -49,19 +49,11 @@ services:
     networks:
       - toolbox-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "test", "-f", "/app/server.js"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     logging:
       driver: "json-file"
       options:
@@ -92,14 +84,6 @@ services:
       start_period: 10s
     networks:
       - toolbox-network
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     logging:
       driver: "json-file"
       options:
@@ -111,7 +95,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.28.0.0/16
+        - subnet: 172.30.0.0/16
 
 volumes:
   backend-uploads:

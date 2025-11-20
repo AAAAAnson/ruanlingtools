@@ -4,8 +4,6 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
 import { Image, Wand2, Scissors, FileImage } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { pageTransitions, listContainerAnimation, listItemAnimation } from '@/lib/animations';
 
 const imageTools = [
   {
@@ -40,12 +38,7 @@ const imageTools = [
 export default function ImageToolsPage() {
   return (
     <MainLayout>
-      <motion.div
-        variants={pageTransitions}
-        initial="initial"
-        animate="animate"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16"
-      >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h1 className="font-pixel text-3xl md:text-4xl mb-4 text-gradient">
             Image Tools
@@ -55,19 +48,14 @@ export default function ImageToolsPage() {
           </p>
         </div>
 
-        <motion.div
-          variants={listContainerAnimation}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {imageTools.map((tool) => {
             const Icon = tool.icon;
             const isAvailable = tool.status === 'available';
             const opacityClass = isAvailable ? '' : 'opacity-60';
 
             return (
-              <motion.div key={tool.id} variants={listItemAnimation}>
+              <div key={tool.id}>
                 <Link href={isAvailable ? tool.href : '#'}>
                   <PixelCard className={`h-full ${opacityClass}`}>
                     <div className="flex items-start gap-4 mb-4">
@@ -93,11 +81,11 @@ export default function ImageToolsPage() {
                     </div>
                   </PixelCard>
                 </Link>
-              </motion.div>
+              </div>
             );
           })}
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </MainLayout>
   );
 }

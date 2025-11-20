@@ -11,7 +11,6 @@ import {
   BarChart3
 } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
 const textTools = [
   {
@@ -68,20 +67,13 @@ export default function TextToolsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {textTools.map((tool, index) => {
+          {textTools.map((tool) => {
             const Icon = tool.icon;
             return (
               <Link key={tool.id} href={tool.path}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02 }}
-                  className="h-full"
+                <PixelCard
+                  className="h-full cursor-pointer hover:border-pixel-primary transition-colors"
                 >
-                  <PixelCard
-                    className="h-full cursor-pointer hover:border-pixel-primary transition-colors"
-                  >
                     <div className="flex items-start gap-4">
                       <div
                         className="p-3 rounded pixel-border"
@@ -96,8 +88,7 @@ export default function TextToolsPage() {
                         </p>
                       </div>
                     </div>
-                  </PixelCard>
-                </motion.div>
+                </PixelCard>
               </Link>
             );
           })}
