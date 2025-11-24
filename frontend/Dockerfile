@@ -32,7 +32,7 @@ RUN npm ci
 COPY . .
 
 # Accept build arguments
-ARG NEXT_PUBLIC_API_URL=/api
+ARG NEXT_PUBLIC_API_URL=
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1 \

@@ -63,7 +63,7 @@ export default function YouTubePage() {
   const [analysisMode, setAnalysisMode] = useState<'full' | 'db-only'>('full');
   const [getLatestVideos, setGetLatestVideos] = useState(true);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const handleSearch = async () => {
     if (!keyword.trim()) {

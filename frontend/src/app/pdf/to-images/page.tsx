@@ -32,7 +32,7 @@ export default function PDFToImagesPage() {
   const [error, setError] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

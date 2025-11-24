@@ -51,7 +51,7 @@ export default function ImageConvertPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [compareView, setCompareView] = useState<{ original: string; converted: string; filename: string } | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   // 格式化文件大小
   const formatFileSize = (bytes: number): string => {
