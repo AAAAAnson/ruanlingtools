@@ -162,6 +162,11 @@ class YouTubeService:
             keyword: Search keyword
             max_results: Maximum number of results
             min_subscribers: Minimum subscriber count filter
+            published_after: ISO 8601 datetime for filtering videos after this date
+            published_before: ISO 8601 datetime for filtering videos before this date
+            order_by: Sort order (relevance, date, viewCount, rating)
+            get_latest_videos: Whether to fetch latest videos for each channel
+            save_to_database: Whether to save results to database
 
         Returns:
             Dictionary containing KOL analysis results
@@ -169,14 +174,46 @@ class YouTubeService:
         try:
             logger.info(f"Searching KOLs for keyword: {keyword}")
 
-            # Step 1: Search for videos with retry logic
             retry_count = 0
             max_retries = len(self.api_keys)
+            channel_ids = set()
+
+            # Step 1: Search for channels (to find channels with keyword in name/description)
+            logger.info(f"Step 1: Searching for channels matching '{keyword}'")
+            while retry_count < max_retries:
+                try:
+                    channel_search_params = {
+                        'q': keyword,
+                        'part': 'id,snippet',
+                        'type': 'channel',
+                        'maxResults': min(max_results, 50),
+                        'order': order_by,
+                        'relevanceLanguage': 'en'
+                    }
+
+                    channel_search_response = self.youtube.search().list(**channel_search_params).execute()
+
+                    for item in channel_search_response.get('items', []):
+                        if item['id'].get('channelId'):
+                            channel_ids.add(item['id']['channelId'])
+
+                    logger.info(f"Found {len(channel_ids)} channels from channel search")
+                    break
+                except Exception as e:
+                    if str(e) == "QUOTA_EXCEEDED_RETRY":
+                        retry_count += 1
+                        continue
+                    raise
+
+            # Step 2: Search for videos (to find channels with videos matching keyword)
+            logger.info(f"Step 2: Searching for videos matching '{keyword}'")
+            video_ids = []
+            retry_count = 0
 
             while retry_count < max_retries:
                 try:
                     # Build search parameters
-                    search_params = {
+                    video_search_params = {
                         'q': keyword,
                         'part': 'id,snippet',
                         'type': 'video',
@@ -187,34 +224,32 @@ class YouTubeService:
 
                     # Add time range filters if provided
                     if published_after:
-                        search_params['publishedAfter'] = published_after
+                        video_search_params['publishedAfter'] = published_after
                     if published_before:
-                        search_params['publishedBefore'] = published_before
+                        video_search_params['publishedBefore'] = published_before
 
-                    search_response = self.youtube.search().list(**search_params).execute()
-                    break  # Success, exit retry loop
+                    video_search_response = self.youtube.search().list(**video_search_params).execute()
+
+                    for item in video_search_response.get('items', []):
+                        if item['id'].get('videoId'):
+                            video_ids.append(item['id']['videoId'])
+                            channel_ids.add(item['snippet']['channelId'])
+
+                    logger.info(f"Found {len(video_ids)} videos from {len(channel_ids)} total unique channels")
+                    break
                 except Exception as e:
                     if str(e) == "QUOTA_EXCEEDED_RETRY":
                         retry_count += 1
                         continue
                     raise
 
-            if not search_response.get('items'):
+            if not channel_ids:
                 return {
                     'keyword': keyword,
                     'channels': [],
                     'total_videos': 0,
-                    'message': 'No results found'
+                    'message': 'No channels found matching the keyword'
                 }
-
-            # Step 2: Extract video IDs and channel IDs
-            video_ids = []
-            channel_ids = set()
-
-            for item in search_response['items']:
-                if item['id'].get('videoId'):
-                    video_ids.append(item['id']['videoId'])
-                    channel_ids.add(item['snippet']['channelId'])
 
             # Step 3: Get video details (for engagement data)
             videos_data = {}
@@ -277,35 +312,140 @@ class YouTubeService:
                     videos_data[channel_id]['total_views'] += view_count
                     videos_data[channel_id]['video_count'] += 1
 
-            # Step 4: Get channel details
-            channels_list = list(videos_data.keys())
+            # Step 4: Get channel details for ALL found channels
+            logger.info(f"Step 4: Getting details for {len(channel_ids)} channels")
+            channels_list = list(channel_ids)
             kol_results = []
 
             if channels_list:
                 retry_count = 0
-                while retry_count < max_retries:
-                    try:
-                        channels_response = self.youtube.channels().list(
-                            id=','.join(channels_list),
-                            part='snippet,statistics,brandingSettings'
-                        ).execute()
-                        break
-                    except Exception as e:
-                        if str(e) == "QUOTA_EXCEEDED_RETRY":
-                            retry_count += 1
-                            continue
-                        raise
+                # Process channels in batches of 50 (API limit)
+                channels_to_process = []
+                for i in range(0, len(channels_list), 50):
+                    batch = channels_list[i:i+50]
+                    retry_count = 0
+                    while retry_count < max_retries:
+                        try:
+                            channels_response = self.youtube.channels().list(
+                                id=','.join(batch),
+                                part='snippet,statistics,brandingSettings'
+                            ).execute()
+                            channels_to_process.extend(channels_response.get('items', []))
+                            break
+                        except Exception as e:
+                            if str(e) == "QUOTA_EXCEEDED_RETRY":
+                                retry_count += 1
+                                continue
+                            raise
 
-                for channel in channels_response.get('items', []):
+                logger.info(f"Retrieved details for {len(channels_to_process)} channels")
+
+                # Step 5: For channels without video data, fetch their latest videos
+                for channel in channels_to_process:
                     channel_id = channel['id']
-                    if channel_id not in videos_data:
-                        continue
-
                     stats = channel.get('statistics', {})
                     subscriber_count = int(stats.get('subscriberCount', 0))
 
                     # Filter by minimum subscribers
                     if subscriber_count < min_subscribers:
+                        continue
+
+                    # If channel has no video data yet and get_latest_videos is enabled, fetch them
+                    if channel_id not in videos_data and get_latest_videos:
+                        logger.info(f"Fetching latest videos for channel: {channel['snippet'].get('title')}")
+                        retry_count = 0
+                        while retry_count < max_retries:
+                            try:
+                                # Search for videos from this specific channel
+                                channel_videos_params = {
+                                    'channelId': channel_id,
+                                    'part': 'id,snippet',
+                                    'type': 'video',
+                                    'maxResults': 10,
+                                    'order': 'date'  # Get latest videos
+                                }
+
+                                # Add time filters if provided
+                                if published_after:
+                                    channel_videos_params['publishedAfter'] = published_after
+                                if published_before:
+                                    channel_videos_params['publishedBefore'] = published_before
+
+                                channel_videos_response = self.youtube.search().list(**channel_videos_params).execute()
+
+                                # Collect video IDs from this channel
+                                channel_video_ids = []
+                                for item in channel_videos_response.get('items', []):
+                                    if item['id'].get('videoId'):
+                                        channel_video_ids.append(item['id']['videoId'])
+
+                                # Get video details
+                                if channel_video_ids:
+                                    videos_response = self.youtube.videos().list(
+                                        id=','.join(channel_video_ids),
+                                        part='statistics,contentDetails,snippet'
+                                    ).execute()
+
+                                    # Initialize videos_data for this channel
+                                    videos_data[channel_id] = {
+                                        'channel_id': channel_id,
+                                        'channel_title': channel['snippet'].get('title'),
+                                        'videos': [],
+                                        'total_views': 0,
+                                        'video_count': 0
+                                    }
+
+                                    for video in videos_response.get('items', []):
+                                        duration_seconds = self.parse_iso8601_duration(
+                                            video.get('contentDetails', {}).get('duration', '')
+                                        )
+
+                                        # Include all videos (don't skip Shorts for comprehensive analysis)
+                                        stats_v = video.get('statistics', {})
+                                        view_count = int(stats_v.get('viewCount', 0))
+                                        like_count = int(stats_v.get('likeCount', 0))
+                                        comment_count = int(stats_v.get('commentCount', 0))
+
+                                        engagement_rate = self.calculate_engagement_rate(
+                                            like_count, comment_count, view_count
+                                        )
+
+                                        videos_data[channel_id]['videos'].append({
+                                            'video_id': video['id'],
+                                            'title': video['snippet']['title'],
+                                            'view_count': view_count,
+                                            'like_count': like_count,
+                                            'comment_count': comment_count,
+                                            'engagement_rate': engagement_rate,
+                                            'published_at': video['snippet']['publishedAt'],
+                                            'thumbnail': video['snippet']['thumbnails'].get('medium', {}).get('url', ''),
+                                            'url': f"https://youtube.com/watch?v={video['id']}"
+                                        })
+
+                                        videos_data[channel_id]['total_views'] += view_count
+                                        videos_data[channel_id]['video_count'] += 1
+
+                                break
+                            except Exception as e:
+                                if str(e) == "QUOTA_EXCEEDED_RETRY":
+                                    retry_count += 1
+                                    continue
+                                # Don't fail if fetching channel videos fails, just log and continue
+                                logger.warning(f"Failed to fetch videos for channel {channel_id}: {e}")
+                                break
+
+                # Step 6: Build results
+                for channel in channels_to_process:
+                    channel_id = channel['id']
+                    stats = channel.get('statistics', {})
+                    subscriber_count = int(stats.get('subscriberCount', 0))
+
+                    # Filter by minimum subscribers
+                    if subscriber_count < min_subscribers:
+                        continue
+
+                    # Skip channels with no video data
+                    if channel_id not in videos_data:
                         continue
 
                     snippet = channel.get('snippet', {})

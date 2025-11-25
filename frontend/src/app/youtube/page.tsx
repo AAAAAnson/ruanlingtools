@@ -8,7 +8,7 @@ import { PixelButton } from '@/components/ui/PixelButton';
 import { PixelInput } from '@/components/ui/PixelInput';
 import { PixelCheckbox } from '@/components/ui/PixelCheckbox';
 import { PixelLoading } from '@/components/ui/PixelLoading';
-import { Search, Youtube, Users, Eye, ThumbsUp, MessageSquare, ExternalLink, TrendingUp, Settings as SettingsIcon, Download, Database, Zap } from 'lucide-react';
+import { Search, Youtube, Users, Eye, ThumbsUp, MessageSquare, ExternalLink, TrendingUp, Settings as SettingsIcon, Download, Database, Zap, History } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Video {
@@ -63,6 +63,11 @@ export default function YouTubePage() {
   const [analysisMode, setAnalysisMode] = useState<'full' | 'db-only'>('full');
   const [getLatestVideos, setGetLatestVideos] = useState(true);
 
+  // Advanced filters
+  const [publishedAfter, setPublishedAfter] = useState('');
+  const [publishedBefore, setPublishedBefore] = useState('');
+  const [orderBy, setOrderBy] = useState('relevance');
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const handleSearch = async () => {
@@ -77,18 +82,29 @@ export default function YouTubePage() {
     setSelectedChannel(null);
 
     try {
+      const requestBody: any = {
+        keyword: keyword.trim(),
+        max_results: parseInt(maxResults) || 20,
+        min_subscribers: parseInt(minSubscribers) || 10000,
+        db_only: analysisMode === 'db-only',
+        get_latest_videos: getLatestVideos,
+        order_by: orderBy,
+      };
+
+      // Add time range filters if provided
+      if (publishedAfter) {
+        requestBody.published_after = new Date(publishedAfter).toISOString();
+      }
+      if (publishedBefore) {
+        requestBody.published_before = new Date(publishedBefore).toISOString();
+      }
+
       const response = await fetch(`${API_BASE}/api/youtube/kol-search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          keyword: keyword.trim(),
-          max_results: parseInt(maxResults) || 20,
-          min_subscribers: parseInt(minSubscribers) || 10000,
-          db_only: analysisMode === 'db-only',
-          get_latest_videos: getLatestVideos,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -146,14 +162,24 @@ export default function YouTubePage() {
             <div className="flex items-center justify-center gap-3 mb-4">
               <Youtube className="w-12 h-12 text-primary" />
               <h1 className="font-pixel text-3xl text-primary">YouTube KOL Search</h1>
-              <PixelButton
-                onClick={() => router.push('/settings')}
-                variant="secondary"
-                size="sm"
-                icon={<SettingsIcon className="w-4 h-4" />}
-              >
-                Settings
-              </PixelButton>
+              <div className="flex gap-2">
+                <PixelButton
+                  onClick={() => window.open(`${API_BASE}/api/youtube/history`, '_blank')}
+                  variant="accent"
+                  size="sm"
+                  icon={<History className="w-4 h-4" />}
+                >
+                  History
+                </PixelButton>
+                <PixelButton
+                  onClick={() => router.push('/settings')}
+                  variant="secondary"
+                  size="sm"
+                  icon={<SettingsIcon className="w-4 h-4" />}
+                >
+                  Settings
+                </PixelButton>
+              </div>
             </div>
             <p className="text-gray-400 font-body">
               Discover influential YouTube channels and analyze their performance
@@ -204,6 +230,54 @@ export default function YouTubePage() {
                     max="50"
                     className="w-full"
                   />
+                </div>
+              </div>
+
+              {/* Time Range Filters */}
+              <div className="border-t-2 border-gray-700 pt-4">
+                <label className="block text-sm font-pixel mb-3 text-gray-300">
+                  📅 Time Range (Optional)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 font-body mb-1">
+                      Published After
+                    </label>
+                    <PixelInput
+                      type="date"
+                      value={publishedAfter}
+                      onChange={(e) => setPublishedAfter(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 font-body mb-1">
+                      Published Before
+                    </label>
+                    <PixelInput
+                      type="date"
+                      value={publishedBefore}
+                      onChange={(e) => setPublishedBefore(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 font-body mb-1">
+                      Sort By
+                    </label>
+                    <select
+                      value={orderBy}
+                      onChange={(e) => setOrderBy(e.target.value)}
+                      className="w-full px-3 py-2 bg-dark border-2 border-gray-700 rounded pixel-border text-gray-300 font-body text-sm focus:border-primary focus:outline-none"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="date">Date (Newest)</option>
+                      <option value="viewCount">View Count</option>
+                      <option value="rating">Rating</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
