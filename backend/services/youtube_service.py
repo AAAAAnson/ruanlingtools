@@ -11,6 +11,7 @@ from datetime import datetime
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import re
+from services.youtube_quota_service import YouTubeQuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ class YouTubeService:
 
         self.current_key_index = 0
         self.youtube = self._build_service()
+        self.quota_service = YouTubeQuotaService()
+        self.quota_used_this_request = 0  # Track quota for current request
         logger.info(f"YouTube service initialized with {len(self.api_keys)} API key(s)")
 
     def _build_service(self):
@@ -133,6 +136,78 @@ class YouTubeService:
             return 0.0
         return ((like_count + comment_count) / view_count) * 100
 
+    def _search_with_pagination(
+        self,
+        search_params: Dict[str, Any],
+        max_pages: int = 3,
+        max_total_results: int = 150
+    ) -> List[Dict[str, Any]]:
+        """
+        Search with automatic pagination support
+
+        Args:
+            search_params: Search parameters for YouTube API
+            max_pages: Maximum number of pages to fetch (default: 3)
+            max_total_results: Maximum total results to fetch (default: 150)
+
+        Returns:
+            List of all search result items
+        """
+        all_items = []
+        next_page_token = None
+        pages_fetched = 0
+        max_retries = len(self.api_keys)
+
+        while pages_fetched < max_pages and len(all_items) < max_total_results:
+            retry_count = 0
+
+            # Add pageToken if this is not the first page
+            if next_page_token:
+                search_params['pageToken'] = next_page_token
+
+            while retry_count < max_retries:
+                try:
+                    response = self.youtube.search().list(**search_params).execute()
+
+                    # Record quota usage (search.list = 100 units)
+                    self.quota_service.record_quota_usage(
+                        api_key_index=self.current_key_index,
+                        operation='search',
+                        cost=100,
+                        request_details={'params': str(search_params)}
+                    )
+                    self.quota_used_this_request += 100
+
+                    # Add items from this page
+                    items = response.get('items', [])
+                    all_items.extend(items)
+
+                    # Get next page token
+                    next_page_token = response.get('nextPageToken')
+
+                    pages_fetched += 1
+                    logger.info(f"Fetched page {pages_fetched}, total items so far: {len(all_items)}")
+
+                    # Break if no more pages
+                    if not next_page_token:
+                        logger.info("No more pages available")
+                        break
+
+                    break  # Success, exit retry loop
+
+                except Exception as e:
+                    if str(e) == "QUOTA_EXCEEDED_RETRY":
+                        retry_count += 1
+                        continue
+                    raise
+
+            # If no next page token, stop pagination
+            if not next_page_token:
+                break
+
+        logger.info(f"Pagination complete: fetched {pages_fetched} pages, {len(all_items)} total items")
+        return all_items[:max_total_results]  # Trim to max_total_results
+
     def format_number(self, num: int) -> str:
         """Format number for display (e.g., 1.2K, 3.4M)"""
         if num < 1000:
@@ -153,95 +228,88 @@ class YouTubeService:
         published_before: Optional[str] = None,
         order_by: str = "relevance",
         get_latest_videos: bool = True,
-        save_to_database: bool = True
+        save_to_database: bool = True,
+        max_pages: int = 3
     ) -> Dict[str, Any]:
         """
-        Search for KOLs (influential channels) by keyword
+        Search for KOLs (influential channels) by keyword with pagination support
 
         Args:
             keyword: Search keyword
-            max_results: Maximum number of results
+            max_results: Maximum number of results per page (50 max per API)
             min_subscribers: Minimum subscriber count filter
             published_after: ISO 8601 datetime for filtering videos after this date
             published_before: ISO 8601 datetime for filtering videos before this date
             order_by: Sort order (relevance, date, viewCount, rating)
             get_latest_videos: Whether to fetch latest videos for each channel
             save_to_database: Whether to save results to database
+            max_pages: Maximum number of pages to fetch (default: 3)
 
         Returns:
-            Dictionary containing KOL analysis results
+            Dictionary containing KOL analysis results with quota usage info
         """
         try:
-            logger.info(f"Searching KOLs for keyword: {keyword}")
+            logger.info(f"Searching KOLs for keyword: {keyword}, max_pages: {max_pages}")
 
-            retry_count = 0
-            max_retries = len(self.api_keys)
+            # Reset quota tracking for this request
+            self.quota_used_this_request = 0
+
             channel_ids = set()
-
-            # Step 1: Search for channels (to find channels with keyword in name/description)
-            logger.info(f"Step 1: Searching for channels matching '{keyword}'")
-            while retry_count < max_retries:
-                try:
-                    channel_search_params = {
-                        'q': keyword,
-                        'part': 'id,snippet',
-                        'type': 'channel',
-                        'maxResults': min(max_results, 50),
-                        'order': order_by,
-                        'relevanceLanguage': 'en'
-                    }
-
-                    channel_search_response = self.youtube.search().list(**channel_search_params).execute()
-
-                    for item in channel_search_response.get('items', []):
-                        if item['id'].get('channelId'):
-                            channel_ids.add(item['id']['channelId'])
-
-                    logger.info(f"Found {len(channel_ids)} channels from channel search")
-                    break
-                except Exception as e:
-                    if str(e) == "QUOTA_EXCEEDED_RETRY":
-                        retry_count += 1
-                        continue
-                    raise
-
-            # Step 2: Search for videos (to find channels with videos matching keyword)
-            logger.info(f"Step 2: Searching for videos matching '{keyword}'")
             video_ids = []
-            retry_count = 0
 
-            while retry_count < max_retries:
-                try:
-                    # Build search parameters
-                    video_search_params = {
-                        'q': keyword,
-                        'part': 'id,snippet',
-                        'type': 'video',
-                        'maxResults': min(max_results, 50),
-                        'order': order_by,
-                        'relevanceLanguage': 'en'
-                    }
+            # Step 1: Search for channels with pagination (to find channels with keyword in name/description)
+            logger.info(f"Step 1: Searching for channels matching '{keyword}'")
+            channel_search_params = {
+                'q': keyword,
+                'part': 'id,snippet',
+                'type': 'channel',
+                'maxResults': min(max_results, 50),
+                'order': order_by,
+                'relevanceLanguage': 'en'
+            }
 
-                    # Add time range filters if provided
-                    if published_after:
-                        video_search_params['publishedAfter'] = published_after
-                    if published_before:
-                        video_search_params['publishedBefore'] = published_before
+            channel_items = self._search_with_pagination(
+                channel_search_params,
+                max_pages=max_pages,
+                max_total_results=max_results * max_pages
+            )
 
-                    video_search_response = self.youtube.search().list(**video_search_params).execute()
+            for item in channel_items:
+                if item['id'].get('channelId'):
+                    channel_ids.add(item['id']['channelId'])
 
-                    for item in video_search_response.get('items', []):
-                        if item['id'].get('videoId'):
-                            video_ids.append(item['id']['videoId'])
-                            channel_ids.add(item['snippet']['channelId'])
+            logger.info(f"Found {len(channel_ids)} channels from channel search")
 
-                    logger.info(f"Found {len(video_ids)} videos from {len(channel_ids)} total unique channels")
-                    break
-                except Exception as e:
-                    if str(e) == "QUOTA_EXCEEDED_RETRY":
-                        retry_count += 1
-                        continue
-                    raise
+            # Step 2: Search for videos with pagination (to find channels with videos matching keyword)
+            logger.info(f"Step 2: Searching for videos matching '{keyword}'")
+
+            video_search_params = {
+                'q': keyword,
+                'part': 'id,snippet',
+                'type': 'video',
+                'maxResults': min(max_results, 50),
+                'order': order_by,
+                'relevanceLanguage': 'en'
+            }
+
+            # Add time range filters if provided
+            if published_after:
+                video_search_params['publishedAfter'] = published_after
+            if published_before:
+                video_search_params['publishedBefore'] = published_before
+
+            video_items = self._search_with_pagination(
+                video_search_params,
+                max_pages=max_pages,
+                max_total_results=max_results * max_pages
+            )
+
+            for item in video_items:
+                if item['id'].get('videoId'):
+                    video_ids.append(item['id']['videoId'])
+                    channel_ids.add(item['snippet']['channelId'])
+
+            logger.info(f"Found {len(video_ids)} videos from {len(channel_ids)} total unique channels")
 
             if not channel_ids:
                 return {
@@ -253,6 +321,7 @@ class YouTubeService:
 
             # Step 3: Get video details (for engagement data)
             videos_data = {}
+            max_retries = len(self.api_keys)
             if video_ids:
                 retry_count = 0
                 while retry_count < max_retries:
@@ -261,6 +330,16 @@ class YouTubeService:
                             id=','.join(video_ids),
                             part='statistics,contentDetails,snippet'
                         ).execute()
+
+                        # Record quota usage (videos.list = 1 unit)
+                        self.quota_service.record_quota_usage(
+                            api_key_index=self.current_key_index,
+                            operation='videos',
+                            cost=1,
+                            request_details={'video_count': len(video_ids)}
+                        )
+                        self.quota_used_this_request += 1
+
                         break
                     except Exception as e:
                         if str(e) == "QUOTA_EXCEEDED_RETRY":
@@ -330,6 +409,16 @@ class YouTubeService:
                                 id=','.join(batch),
                                 part='snippet,statistics,brandingSettings'
                             ).execute()
+
+                            # Record quota usage (channels.list = 1 unit)
+                            self.quota_service.record_quota_usage(
+                                api_key_index=self.current_key_index,
+                                operation='channels',
+                                cost=1,
+                                request_details={'channel_count': len(batch)}
+                            )
+                            self.quota_used_this_request += 1
+
                             channels_to_process.extend(channels_response.get('items', []))
                             break
                         except Exception as e:
@@ -373,6 +462,15 @@ class YouTubeService:
 
                                 channel_videos_response = self.youtube.search().list(**channel_videos_params).execute()
 
+                                # Record quota usage (search.list = 100 units)
+                                self.quota_service.record_quota_usage(
+                                    api_key_index=self.current_key_index,
+                                    operation='search',
+                                    cost=100,
+                                    request_details={'type': 'channel_videos', 'channel_id': channel_id}
+                                )
+                                self.quota_used_this_request += 100
+
                                 # Collect video IDs from this channel
                                 channel_video_ids = []
                                 for item in channel_videos_response.get('items', []):
@@ -385,6 +483,15 @@ class YouTubeService:
                                         id=','.join(channel_video_ids),
                                         part='statistics,contentDetails,snippet'
                                     ).execute()
+
+                                    # Record quota usage (videos.list = 1 unit)
+                                    self.quota_service.record_quota_usage(
+                                        api_key_index=self.current_key_index,
+                                        operation='videos',
+                                        cost=1,
+                                        request_details={'video_count': len(channel_video_ids), 'channel_id': channel_id}
+                                    )
+                                    self.quota_used_this_request += 1
 
                                     # Initialize videos_data for this channel
                                     videos_data[channel_id] = {
@@ -484,14 +591,16 @@ class YouTubeService:
             # Sort by subscriber count
             kol_results.sort(key=lambda x: x['subscriber_count'], reverse=True)
 
-            # Prepare result
+            # Prepare result with quota information
             result = {
                 'keyword': keyword,
                 'channels': kol_results,
                 'total_channels': len(kol_results),
                 'total_videos': sum(c['keyword_videos_count'] for c in kol_results),
                 'timestamp': datetime.now().isoformat(),
-                'api_key_used': f"#{self.current_key_index + 1} of {len(self.api_keys)}"
+                'api_key_used': f"#{self.current_key_index + 1} of {len(self.api_keys)}",
+                'quota_used': self.quota_used_this_request,
+                'max_pages': max_pages
             }
 
             # Save to database if requested

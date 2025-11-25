@@ -67,8 +67,48 @@ export default function YouTubePage() {
   const [publishedAfter, setPublishedAfter] = useState('');
   const [publishedBefore, setPublishedBefore] = useState('');
   const [orderBy, setOrderBy] = useState('relevance');
+  const [maxPages, setMaxPages] = useState('3');
+
+  // Quota management
+  const [showQuotaEstimate, setShowQuotaEstimate] = useState(false);
+  const [quotaEstimate, setQuotaEstimate] = useState<any>(null);
+  const [quotaUsage, setQuotaUsage] = useState<any>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+  const fetchQuotaEstimate = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/youtube/quota/estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_results: parseInt(maxResults) || 50,
+          get_latest_videos: getLatestVideos,
+          max_pages: parseInt(maxPages) || 3,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.code === 200) {
+        setQuotaEstimate(data.data);
+        setShowQuotaEstimate(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch quota estimate:', err);
+    }
+  };
+
+  const fetchQuotaUsage = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/youtube/quota/usage`);
+      const data = await response.json();
+      if (data.code === 200) {
+        setQuotaUsage(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch quota usage:', err);
+    }
+  };
 
   const handleSearch = async () => {
     if (!keyword.trim()) {
@@ -89,6 +129,7 @@ export default function YouTubePage() {
         db_only: analysisMode === 'db-only',
         get_latest_videos: getLatestVideos,
         order_by: orderBy,
+        max_pages: parseInt(maxPages) || 3,
       };
 
       // Add time range filters if provided
@@ -236,9 +277,9 @@ export default function YouTubePage() {
               {/* Time Range Filters */}
               <div className="border-t-2 border-gray-700 pt-4">
                 <label className="block text-sm font-pixel mb-3 text-gray-300">
-                  📅 Time Range (Optional)
+                  📅 Time Range & Sorting (Optional)
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs text-gray-500 font-body mb-1">
                       Published After
@@ -277,6 +318,22 @@ export default function YouTubePage() {
                       <option value="viewCount">View Count</option>
                       <option value="rating">Rating</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 font-body mb-1">
+                      Max Pages
+                    </label>
+                    <PixelInput
+                      type="number"
+                      value={maxPages}
+                      onChange={(e) => setMaxPages(e.target.value)}
+                      placeholder="3"
+                      min="1"
+                      max="10"
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">1-10 pages (50 results/page)</p>
                   </div>
                 </div>
               </div>
@@ -366,7 +423,40 @@ export default function YouTubePage() {
                 </div>
               </div>
 
+              {/* Quota Estimate Display */}
+              {quotaEstimate && (
+                <div className="p-4 bg-primary/10 border-2 border-primary rounded pixel-border">
+                  <p className="font-pixel text-sm text-primary mb-2">📊 Estimated API Quota</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-body">
+                    <div>
+                      <span className="text-gray-500">Total:</span>
+                      <span className="text-primary font-bold ml-2">{quotaEstimate.estimated_quota}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Channels:</span>
+                      <span className="text-secondary ml-2">{quotaEstimate.estimated_channels}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Videos:</span>
+                      <span className="text-accent ml-2">{quotaEstimate.estimated_videos}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Pages:</span>
+                      <span className="text-success ml-2">{quotaEstimate.pages}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3">
+                <PixelButton
+                  onClick={fetchQuotaEstimate}
+                  variant="accent"
+                  size="lg"
+                  disabled={isSearching}
+                >
+                  💰 Estimate Quota
+                </PixelButton>
                 <PixelButton
                   onClick={handleSearch}
                   loading={isSearching}
@@ -407,7 +497,7 @@ export default function YouTubePage() {
           {results && results.total_channels > 0 && (
             <div>
               {/* Stats Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <PixelCard hoverable={false}>
                   <div className="flex items-center gap-3">
                     <Users className="w-8 h-8 text-primary" />
@@ -437,6 +527,18 @@ export default function YouTubePage() {
                     </div>
                   </div>
                 </PixelCard>
+
+                {results.quota_used && (
+                  <PixelCard hoverable={false}>
+                    <div className="flex items-center gap-3">
+                      <Zap className="w-8 h-8 text-warning" />
+                      <div>
+                        <p className="text-2xl font-pixel text-warning">{results.quota_used}</p>
+                        <p className="text-sm text-gray-400 font-body">API Quota Used</p>
+                      </div>
+                    </div>
+                  </PixelCard>
+                )}
               </div>
 
               {/* Channels List */}

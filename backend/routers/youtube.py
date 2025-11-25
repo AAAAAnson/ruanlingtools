@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class KOLSearchRequest(BaseModel):
     """KOL search request model"""
     keyword: str = Field(..., min_length=1, max_length=100, description="Search keyword")
-    max_results: int = Field(50, ge=1, le=50, description="Maximum results to return")
+    max_results: int = Field(50, ge=1, le=50, description="Maximum results per page")
     min_subscribers: int = Field(10000, ge=0, description="Minimum subscriber count filter")
     # New fields for enhanced search
     published_after: Optional[str] = Field(None, description="Start date (ISO 8601: 2023-01-01T00:00:00Z)")
@@ -29,6 +29,14 @@ class KOLSearchRequest(BaseModel):
     order_by: str = Field("relevance", description="Sort order: relevance, date, viewCount, rating")
     get_latest_videos: bool = Field(True, description="Get latest videos for each channel")
     save_to_database: bool = Field(True, description="Save search results to database")
+    max_pages: int = Field(3, ge=1, le=10, description="Maximum pages to fetch (1-10)")
+
+
+class QuotaEstimateRequest(BaseModel):
+    """API quota estimation request model"""
+    max_results: int = Field(50, ge=1, le=50, description="Max results per page")
+    get_latest_videos: bool = Field(True, description="Whether to fetch latest videos")
+    max_pages: int = Field(3, ge=1, le=10, description="Number of pages to fetch")
 
 
 @router.get("/")
@@ -102,7 +110,8 @@ async def search_kols(request: KOLSearchRequest):
             published_before=request.published_before,
             order_by=request.order_by,
             get_latest_videos=request.get_latest_videos,
-            save_to_database=request.save_to_database
+            save_to_database=request.save_to_database,
+            max_pages=request.max_pages
         )
 
         if results['total_channels'] == 0:
@@ -254,5 +263,123 @@ async def get_search_detail(search_id: int):
         logger.error(f"Error getting search detail: {e}", exc_info=True)
         return ApiResponse.error(
             message=f"Failed to get search detail: {str(e)}",
+            code=500
+        )
+
+
+@router.post("/quota/estimate")
+async def estimate_quota(request: QuotaEstimateRequest):
+    """
+    Estimate API quota consumption for a search operation
+
+    Args:
+        request: Quota estimation parameters
+
+    Returns:
+        ApiResponse with estimated quota consumption breakdown
+    """
+    try:
+        from services.youtube_quota_service import YouTubeQuotaService
+
+        quota_service = YouTubeQuotaService()
+        estimation = quota_service.estimate_search_quota(
+            max_results=request.max_results,
+            get_latest_videos=request.get_latest_videos,
+            num_pages=request.max_pages
+        )
+
+        return ApiResponse.success(
+            data=estimation,
+            message="Quota estimation completed"
+        )
+
+    except Exception as e:
+        logger.error(f"Error estimating quota: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to estimate quota: {str(e)}",
+            code=500
+        )
+
+
+@router.get("/quota/usage")
+async def get_quota_usage(
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (defaults to today)")
+):
+    """
+    Get API quota usage statistics for a specific date
+
+    Args:
+        date: Date to query (defaults to today)
+
+    Returns:
+        ApiResponse with quota usage statistics
+    """
+    try:
+        from services.youtube_quota_service import YouTubeQuotaService
+
+        quota_service = YouTubeQuotaService()
+        usage_stats = quota_service.get_daily_quota_usage(target_date=date)
+
+        return ApiResponse.success(
+            data=usage_stats,
+            message=f"Quota usage for {usage_stats['date']}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting quota usage: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get quota usage: {str(e)}",
+            code=500
+        )
+
+
+@router.get("/quota/recommendation")
+async def get_quota_recommendation():
+    """
+    Get recommendations for API key management based on usage patterns
+
+    Returns:
+        ApiResponse with API key management recommendations
+    """
+    try:
+        from services.youtube_quota_service import YouTubeQuotaService
+        from services.settings_service import get_settings_service
+
+        quota_service = YouTubeQuotaService()
+        settings_service = get_settings_service()
+
+        # Get current number of API keys
+        api_keys = settings_service.get_youtube_keys()
+        num_keys = len(api_keys) if api_keys else 0
+
+        # Get recent usage (last 7 days average)
+        from datetime import datetime, timedelta
+        total_usage = 0
+        days_count = 0
+
+        for i in range(7):
+            target_date = (datetime.now() - timedelta(days=i)).date().isoformat()
+            usage_stats = quota_service.get_daily_quota_usage(target_date)
+            if not usage_stats.get('error'):
+                total_usage += usage_stats.get('total_quota_used', 0)
+                days_count += 1
+
+        avg_daily_usage = total_usage // days_count if days_count > 0 else 0
+
+        # Get recommendation
+        recommendation = quota_service.get_quota_recommendation(
+            num_keys=num_keys,
+            avg_daily_usage=avg_daily_usage
+        )
+
+        return ApiResponse.success(
+            data=recommendation,
+            message="Quota recommendation generated"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting quota recommendation: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get quota recommendation: {str(e)}",
             code=500
         )
