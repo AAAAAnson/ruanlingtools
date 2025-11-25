@@ -23,6 +23,12 @@ class KOLSearchRequest(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=100, description="Search keyword")
     max_results: int = Field(50, ge=1, le=50, description="Maximum results to return")
     min_subscribers: int = Field(10000, ge=0, description="Minimum subscriber count filter")
+    # New fields for enhanced search
+    published_after: Optional[str] = Field(None, description="Start date (ISO 8601: 2023-01-01T00:00:00Z)")
+    published_before: Optional[str] = Field(None, description="End date (ISO 8601: 2024-12-31T23:59:59Z)")
+    order_by: str = Field("relevance", description="Sort order: relevance, date, viewCount, rating")
+    get_latest_videos: bool = Field(True, description="Get latest videos for each channel")
+    save_to_database: bool = Field(True, description="Save search results to database")
 
 
 @router.get("/")
@@ -91,7 +97,12 @@ async def search_kols(request: KOLSearchRequest):
         results = await youtube_service.search_kols(
             keyword=request.keyword,
             max_results=request.max_results,
-            min_subscribers=request.min_subscribers
+            min_subscribers=request.min_subscribers,
+            published_after=request.published_after,
+            published_before=request.published_before,
+            order_by=request.order_by,
+            get_latest_videos=request.get_latest_videos,
+            save_to_database=request.save_to_database
         )
 
         if results['total_channels'] == 0:
@@ -170,3 +181,78 @@ async def get_youtube_config():
         },
         message="YouTube configuration status"
     )
+
+
+@router.get("/history")
+async def get_search_history(
+    keyword: Optional[str] = Query(None, description="Filter by keyword"),
+    start_date: Optional[str] = Query(None, description="Start date filter"),
+    end_date: Optional[str] = Query(None, description="End date filter"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination")
+):
+    """
+    Get search history
+
+    Returns list of previous KOL searches with basic statistics
+    """
+    try:
+        from repositories.youtube_repository import YouTubeRepository
+
+        repo = YouTubeRepository()
+        history = repo.get_search_history(
+            keyword=keyword,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset
+        )
+
+        return ApiResponse.success(
+            data={
+                "searches": history,
+                "total": len(history),
+                "limit": limit,
+                "offset": offset
+            },
+            message=f"Retrieved {len(history)} search records"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting search history: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get search history: {str(e)}",
+            code=500
+        )
+
+
+@router.get("/history/{search_id}")
+async def get_search_detail(search_id: int):
+    """
+    Get detailed search results
+
+    Returns complete search results including all channels and videos
+    """
+    try:
+        from repositories.youtube_repository import YouTubeRepository
+
+        repo = YouTubeRepository()
+        detail = repo.get_search_detail(search_id)
+
+        if not detail:
+            return ApiResponse.error(
+                message=f"Search record not found: {search_id}",
+                code=404
+            )
+
+        return ApiResponse.success(
+            data=detail,
+            message=f"Search detail for '{detail['keyword']}'"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting search detail: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get search detail: {str(e)}",
+            code=500
+        )

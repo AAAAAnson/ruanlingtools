@@ -148,7 +148,12 @@ class YouTubeService:
         self,
         keyword: str,
         max_results: int = 50,
-        min_subscribers: int = 10000
+        min_subscribers: int = 10000,
+        published_after: Optional[str] = None,
+        published_before: Optional[str] = None,
+        order_by: str = "relevance",
+        get_latest_videos: bool = True,
+        save_to_database: bool = True
     ) -> Dict[str, Any]:
         """
         Search for KOLs (influential channels) by keyword
@@ -170,14 +175,23 @@ class YouTubeService:
 
             while retry_count < max_retries:
                 try:
-                    search_response = self.youtube.search().list(
-                        q=keyword,
-                        part='id,snippet',
-                        type='video',
-                        maxResults=min(max_results, 50),
-                        order='relevance',
-                        relevanceLanguage='en'
-                    ).execute()
+                    # Build search parameters
+                    search_params = {
+                        'q': keyword,
+                        'part': 'id,snippet',
+                        'type': 'video',
+                        'maxResults': min(max_results, 50),
+                        'order': order_by,
+                        'relevanceLanguage': 'en'
+                    }
+
+                    # Add time range filters if provided
+                    if published_after:
+                        search_params['publishedAfter'] = published_after
+                    if published_before:
+                        search_params['publishedBefore'] = published_before
+
+                    search_response = self.youtube.search().list(**search_params).execute()
                     break  # Success, exit retry loop
                 except Exception as e:
                     if str(e) == "QUOTA_EXCEEDED_RETRY":
@@ -330,7 +344,8 @@ class YouTubeService:
             # Sort by subscriber count
             kol_results.sort(key=lambda x: x['subscriber_count'], reverse=True)
 
-            return {
+            # Prepare result
+            result = {
                 'keyword': keyword,
                 'channels': kol_results,
                 'total_channels': len(kol_results),
@@ -338,6 +353,62 @@ class YouTubeService:
                 'timestamp': datetime.now().isoformat(),
                 'api_key_used': f"#{self.current_key_index + 1} of {len(self.api_keys)}"
             }
+
+            # Save to database if requested
+            if save_to_database and kol_results:
+                try:
+                    from repositories.youtube_repository import YouTubeRepository
+
+                    repo = YouTubeRepository()
+
+                    # Save search record
+                    search_data = {
+                        'keyword': keyword,
+                        'min_subscribers': min_subscribers,
+                        'max_results': max_results,
+                        'published_after': published_after,
+                        'published_before': published_before,
+                        'order_by': order_by,
+                        'total_channels': len(kol_results),
+                        'total_videos': sum(c['keyword_videos_count'] for c in kol_results),
+                        'api_key_used': result['api_key_used']
+                    }
+                    search_id = repo.save_search(search_data)
+
+                    # Save channels and videos
+                    for rank, channel in enumerate(kol_results, 1):
+                        # Save channel
+                        repo.save_channel(channel)
+
+                        # Save videos
+                        if channel.get('latest_videos'):
+                            videos_to_save = []
+                            for video in channel['latest_videos']:
+                                video['channel_id'] = channel['channel_id']
+                                videos_to_save.append(video)
+                            repo.save_videos(videos_to_save)
+
+                        # Save search-channel association
+                        repo.save_search_channel_association(
+                            search_id=search_id,
+                            channel_id=channel['channel_id'],
+                            stats={
+                                'keyword_videos_count': channel['keyword_videos_count'],
+                                'keyword_total_views': channel['keyword_total_views'],
+                                'keyword_avg_views': channel['keyword_avg_views'],
+                                'keyword_avg_engagement': channel['keyword_avg_engagement']
+                            },
+                            rank=rank
+                        )
+
+                    result['search_id'] = search_id
+                    logger.info(f"Saved search #{search_id} to database")
+
+                except Exception as e:
+                    logger.error(f"Error saving to database: {e}", exc_info=True)
+                    # Don't fail the request if database save fails
+
+            return result
 
         except HttpError as e:
             logger.error(f"YouTube API error: {e}")
