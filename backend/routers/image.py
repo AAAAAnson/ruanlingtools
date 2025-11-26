@@ -8,11 +8,12 @@ This module handles all image-related operations:
 - Watermark application
 - Batch processing
 """
+import json
+from pathlib import Path
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
-from typing import List, Optional
-from pathlib import Path
-import traceback
 
 from models.response import ApiResponse
 from services.image_service import ImageService
@@ -22,13 +23,37 @@ router = APIRouter()
 image_service = ImageService()
 
 
+def sanitize_filename(filename: str) -> str:
+    """Remove unsupported characters from filenames and return a safe base name."""
+    base_name = Path(filename).stem
+    safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in base_name).strip('_')
+    return safe_name or "image"
+
+
+def build_download_name(filename: str) -> str:
+    """Derive a user-friendly download filename from a stored converted filename."""
+    stored_name = Path(filename)
+    stem = stored_name.stem
+    parts = stem.split('_')
+
+    # stored format: <requested_name>_<YYYYMMDD>_<HHMMSS>_<uuid8>
+    if len(parts) >= 4:
+        base_name = "_".join(parts[:-3])
+    else:
+        base_name = stem
+
+    base_name = base_name or "image"
+    return f"{base_name}.{stored_name.suffix.lstrip('.')}"
+
+
 @router.post("/convert")
 async def convert_images(
     files: List[UploadFile] = File(...),
     output_format: str = Form(...),
     quality: Optional[int] = Form(85),
     width: Optional[int] = Form(None),
-    height: Optional[int] = Form(None)
+    height: Optional[int] = Form(None),
+    target_names: Optional[str] = Form(None)
 ):
     """
     Convert images to specified format
@@ -64,12 +89,30 @@ async def convert_images(
         results = []
         errors = []
 
+        name_mapping: Dict[str, str] = {}
+        if target_names:
+            try:
+                target_data = json.loads(target_names)
+                if isinstance(target_data, list):
+                    for item in target_data:
+                        if not isinstance(item, dict):
+                            continue
+                        original = item.get("original")
+                        custom = item.get("custom")
+                        if isinstance(original, str) and isinstance(custom, str):
+                            name_mapping[original] = custom
+                else:
+                    return ApiResponse.error(message="target_names must be a JSON array", code=400)
+            except json.JSONDecodeError:
+                return ApiResponse.error(message="Invalid target_names payload", code=400)
+
         for file in files:
             try:
                 # Validate file extension
                 if not file_handler.validate_file_extension(file.filename, allowed_extensions):
                     errors.append({
                         "filename": file.filename,
+                        "original_filename": file.filename,
                         "error": f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
                     })
                     continue
@@ -81,9 +124,13 @@ async def convert_images(
                 if not file_handler.validate_file_size(len(file_data), max_size_mb=10):
                     errors.append({
                         "filename": file.filename,
+                        "original_filename": file.filename,
                         "error": "File size exceeds 10MB limit"
                     })
                     continue
+
+                requested_name = name_mapping.get(file.filename, file.filename)
+                safe_requested_name = sanitize_filename(requested_name)
 
                 # Convert image
                 converted_data, mime_type = image_service.convert_image(
@@ -97,7 +144,7 @@ async def convert_images(
                 # Save converted image
                 saved_filename = image_service.save_converted_image(
                     image_data=converted_data,
-                    original_filename=file.filename,
+                    original_filename=safe_requested_name,
                     extension=output_format
                 )
 
@@ -107,6 +154,7 @@ async def convert_images(
 
                 results.append({
                     "original_filename": file.filename,
+                    "requested_filename": safe_requested_name,
                     "converted_filename": saved_filename,
                     "output_format": output_format,
                     "size": file_info["size"],
@@ -116,7 +164,8 @@ async def convert_images(
 
             except Exception as e:
                 errors.append({
-                    "filename": file.filename,
+                    "filename": safe_requested_name if 'safe_requested_name' in locals() else file.filename,
+                    "original_filename": file.filename,
                     "error": str(e)
                 })
 
@@ -263,9 +312,11 @@ async def download_file(filename: str):
         if not str(file_path.resolve()).startswith(str(Path(image_service.output_dir).resolve())):
             raise HTTPException(status_code=403, detail="Access denied")
 
+        download_name = build_download_name(filename)
+
         return FileResponse(
             path=file_path,
-            filename=filename,
+            filename=download_name,
             media_type="application/octet-stream"
         )
 
@@ -304,7 +355,8 @@ async def download_zip(filenames: List[str]):
             if not str(file_path.resolve()).startswith(str(output_dir.resolve())):
                 continue
 
-            files_to_zip.append((filename, file_path))
+            download_name = build_download_name(filename)
+            files_to_zip.append((download_name, file_path))
 
         if not files_to_zip:
             raise HTTPException(status_code=404, detail="No valid files found")
