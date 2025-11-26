@@ -40,11 +40,26 @@ class YouTubeQuotaService:
         Args:
             max_results: Max results per search
             get_latest_videos: Whether to fetch latest videos for each channel
-            num_pages: Number of pages to fetch (for pagination)
+            num_pages: Number of pages to fetch (0 = unlimited)
 
         Returns:
             Dictionary with quota estimation details
         """
+        # Unlimited mode
+        if num_pages <= 0:
+            return {
+                'estimated_quota': 'Unlimited',
+                'unlimited': True,
+                'breakdown': {
+                    'note': 'Unlimited mode will fetch all available results',
+                    'warning': 'This may consume significant API quota',
+                    'recommendation': 'Consider starting with limited pages first'
+                },
+                'estimated_channels': 'Unknown',
+                'estimated_videos': 'Unknown',
+                'pages': 'Unlimited'
+            }
+
         quota_breakdown = {
             'channel_search': 0,
             'video_search': 0,
@@ -79,6 +94,7 @@ class YouTubeQuotaService:
 
         return {
             'estimated_quota': quota_breakdown['total'],
+            'unlimited': False,
             'breakdown': quota_breakdown,
             'estimated_channels': estimated_channels,
             'estimated_videos': estimated_videos,

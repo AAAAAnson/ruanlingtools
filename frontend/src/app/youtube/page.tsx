@@ -68,6 +68,7 @@ export default function YouTubePage() {
   const [publishedBefore, setPublishedBefore] = useState('');
   const [orderBy, setOrderBy] = useState('relevance');
   const [maxPages, setMaxPages] = useState('3');
+  const [unlimitedMode, setUnlimitedMode] = useState(false);
 
   // Quota management
   const [showQuotaEstimate, setShowQuotaEstimate] = useState(false);
@@ -84,7 +85,7 @@ export default function YouTubePage() {
         body: JSON.stringify({
           max_results: parseInt(maxResults) || 50,
           get_latest_videos: getLatestVideos,
-          max_pages: parseInt(maxPages) || 3,
+          max_pages: unlimitedMode ? 0 : (parseInt(maxPages) || 3),
         }),
       });
 
@@ -129,7 +130,7 @@ export default function YouTubePage() {
         db_only: analysisMode === 'db-only',
         get_latest_videos: getLatestVideos,
         order_by: orderBy,
-        max_pages: parseInt(maxPages) || 3,
+        max_pages: unlimitedMode ? 0 : (parseInt(maxPages) || 3),
       };
 
       // Add time range filters if provided
@@ -330,10 +331,23 @@ export default function YouTubePage() {
                       onChange={(e) => setMaxPages(e.target.value)}
                       placeholder="3"
                       min="1"
-                      max="10"
+                      max="100"
+                      disabled={unlimitedMode}
                       className="w-full"
                     />
-                    <p className="text-xs text-gray-500 mt-1">1-10 pages (50 results/page)</p>
+                    <div className="flex items-center mt-1">
+                      <PixelCheckbox
+                        checked={unlimitedMode}
+                        onChange={(e) => setUnlimitedMode(e.target.checked)}
+                        label="🔥 Unlimited (fetch all results)"
+                      />
+                    </div>
+                    {!unlimitedMode && (
+                      <p className="text-xs text-gray-500 mt-1">1-100 pages (50 results/page)</p>
+                    )}
+                    {unlimitedMode && (
+                      <p className="text-xs text-warning mt-1">⚠️ May consume significant API quota</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -425,26 +439,41 @@ export default function YouTubePage() {
 
               {/* Quota Estimate Display */}
               {quotaEstimate && (
-                <div className="p-4 bg-primary/10 border-2 border-primary rounded pixel-border">
-                  <p className="font-pixel text-sm text-primary mb-2">📊 Estimated API Quota</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-body">
-                    <div>
-                      <span className="text-gray-500">Total:</span>
-                      <span className="text-primary font-bold ml-2">{quotaEstimate.estimated_quota}</span>
+                <div className={`p-4 border-2 rounded pixel-border ${
+                  quotaEstimate.unlimited
+                    ? 'bg-warning/10 border-warning'
+                    : 'bg-primary/10 border-primary'
+                }`}>
+                  <p className={`font-pixel text-sm mb-2 ${
+                    quotaEstimate.unlimited ? 'text-warning' : 'text-primary'
+                  }`}>
+                    {quotaEstimate.unlimited ? '🔥 Unlimited Mode' : '📊 Estimated API Quota'}
+                  </p>
+                  {quotaEstimate.unlimited ? (
+                    <div className="text-xs font-body space-y-1">
+                      <p className="text-warning">⚠️ {quotaEstimate.breakdown.warning}</p>
+                      <p className="text-gray-400">💡 {quotaEstimate.breakdown.recommendation}</p>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Channels:</span>
-                      <span className="text-secondary ml-2">{quotaEstimate.estimated_channels}</span>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-body">
+                      <div>
+                        <span className="text-gray-500">Total:</span>
+                        <span className="text-primary font-bold ml-2">{quotaEstimate.estimated_quota}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Channels:</span>
+                        <span className="text-secondary ml-2">{quotaEstimate.estimated_channels}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Videos:</span>
+                        <span className="text-accent ml-2">{quotaEstimate.estimated_videos}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Pages:</span>
+                        <span className="text-success ml-2">{quotaEstimate.pages}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Videos:</span>
-                      <span className="text-accent ml-2">{quotaEstimate.estimated_videos}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Pages:</span>
-                      <span className="text-success ml-2">{quotaEstimate.pages}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -464,7 +493,11 @@ export default function YouTubePage() {
                   className="flex-grow"
                   size="lg"
                 >
-                  {analysisMode === 'db-only' ? 'Analyze from Database' : 'Start Analysis'}
+                  {analysisMode === 'db-only'
+                    ? 'Analyze from Database'
+                    : unlimitedMode
+                    ? '🔥 Unlimited Search'
+                    : 'Start Analysis'}
                 </PixelButton>
                 {results && (
                   <PixelButton
@@ -489,7 +522,7 @@ export default function YouTubePage() {
           {/* Loading */}
           {isSearching && (
             <div className="flex justify-center">
-              <PixelLoading text="Searching for KOLs..." />
+              <PixelLoading text={unlimitedMode ? "🔥 Fetching unlimited results... This may take a while..." : "Searching for KOLs..."} />
             </div>
           )}
 

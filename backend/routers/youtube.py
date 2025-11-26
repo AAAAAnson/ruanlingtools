@@ -29,14 +29,14 @@ class KOLSearchRequest(BaseModel):
     order_by: str = Field("relevance", description="Sort order: relevance, date, viewCount, rating")
     get_latest_videos: bool = Field(True, description="Get latest videos for each channel")
     save_to_database: bool = Field(True, description="Save search results to database")
-    max_pages: int = Field(3, ge=1, le=10, description="Maximum pages to fetch (1-10)")
+    max_pages: int = Field(3, ge=0, le=100, description="Maximum pages to fetch (0=unlimited, 1-100=limited)")
 
 
 class QuotaEstimateRequest(BaseModel):
     """API quota estimation request model"""
     max_results: int = Field(50, ge=1, le=50, description="Max results per page")
     get_latest_videos: bool = Field(True, description="Whether to fetch latest videos")
-    max_pages: int = Field(3, ge=1, le=10, description="Number of pages to fetch")
+    max_pages: int = Field(3, ge=0, le=100, description="Number of pages to fetch (0=unlimited)")
 
 
 @router.get("/")

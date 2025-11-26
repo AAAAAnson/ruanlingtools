@@ -147,8 +147,8 @@ class YouTubeService:
 
         Args:
             search_params: Search parameters for YouTube API
-            max_pages: Maximum number of pages to fetch (default: 3)
-            max_total_results: Maximum total results to fetch (default: 150)
+            max_pages: Maximum number of pages to fetch (0 or -1 = unlimited)
+            max_total_results: Maximum total results to fetch (0 = unlimited)
 
         Returns:
             List of all search result items
@@ -158,7 +158,11 @@ class YouTubeService:
         pages_fetched = 0
         max_retries = len(self.api_keys)
 
-        while pages_fetched < max_pages and len(all_items) < max_total_results:
+        # Unlimited mode: max_pages = 0 or -1
+        unlimited_pages = max_pages <= 0
+        unlimited_results = max_total_results <= 0
+
+        while (unlimited_pages or pages_fetched < max_pages) and (unlimited_results or len(all_items) < max_total_results):
             retry_count = 0
 
             # Add pageToken if this is not the first page
@@ -206,7 +210,11 @@ class YouTubeService:
                 break
 
         logger.info(f"Pagination complete: fetched {pages_fetched} pages, {len(all_items)} total items")
-        return all_items[:max_total_results]  # Trim to max_total_results
+
+        # Return all items in unlimited mode, otherwise trim
+        if unlimited_results:
+            return all_items
+        return all_items[:max_total_results]
 
     def format_number(self, num: int) -> str:
         """Format number for display (e.g., 1.2K, 3.4M)"""
@@ -268,10 +276,13 @@ class YouTubeService:
                 'relevanceLanguage': 'en'
             }
 
+            # In unlimited mode, fetch as many as possible
+            max_total = 0 if max_pages <= 0 else max_results * max_pages
+
             channel_items = self._search_with_pagination(
                 channel_search_params,
                 max_pages=max_pages,
-                max_total_results=max_results * max_pages
+                max_total_results=max_total
             )
 
             for item in channel_items:
@@ -301,7 +312,7 @@ class YouTubeService:
             video_items = self._search_with_pagination(
                 video_search_params,
                 max_pages=max_pages,
-                max_total_results=max_results * max_pages
+                max_total_results=max_total
             )
 
             for item in video_items:
