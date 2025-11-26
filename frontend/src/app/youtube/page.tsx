@@ -47,6 +47,8 @@ interface SearchResults {
   total_channels: number;
   total_videos: number;
   timestamp: string;
+  quota_used?: number;
+  max_pages?: number;
 }
 
 export default function YouTubePage() {
