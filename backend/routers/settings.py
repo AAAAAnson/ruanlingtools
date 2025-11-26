@@ -5,7 +5,11 @@ Settings management routes
 This module handles application settings configuration
 """
 import logging
+import os
+import json
+from typing import List
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 from models.response import ApiResponse
 from models.settings import ApplicationSettings, YouTubeAPIKeyUpdate
 from services.settings_service import get_settings_service
@@ -155,5 +159,115 @@ async def get_youtube_keys_status():
         logger.error(f"Error getting YouTube keys status: {e}", exc_info=True)
         return ApiResponse.error(
             message=f"Failed to get YouTube keys status: {str(e)}",
+            code=500
+        )
+
+
+class BatchAddKeysRequest(BaseModel):
+    """批量添加密钥请求"""
+    keys: List[str] = Field(..., min_items=1, max_items=50, description="API密钥列表")
+
+
+@router.get("/youtube/keys/detailed")
+async def get_detailed_keys_info():
+    """
+    获取所有API密钥的详细使用情况（用于Settings页面）
+
+    Returns:
+        详细的密钥使用信息
+    """
+    try:
+        from services.youtube_service import YouTubeService
+        from services.youtube_quota_service import YouTubeQuotaService
+
+        # 获取API密钥数量
+        try:
+            yt_service = YouTubeService()
+            num_keys = len(yt_service.api_keys)
+        except ValueError:
+            # No API keys configured
+            return ApiResponse.success(
+                data={
+                    'summary': {
+                        'total_keys': 0,
+                        'total_used': 0,
+                        'total_remaining': 0,
+                        'total_quota': 0,
+                        'usage_percent': 0
+                    },
+                    'keys': []
+                },
+                message="No API keys configured"
+            )
+
+        # 获取详细信息
+        quota_service = YouTubeQuotaService()
+        detailed_info = quota_service.get_detailed_keys_info(num_keys)
+
+        return ApiResponse.success(
+            data=detailed_info,
+            message=f"Retrieved detailed info for {num_keys} API keys"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting detailed keys info: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get detailed keys info: {str(e)}",
+            code=500
+        )
+
+
+@router.post("/youtube/keys/batch-add")
+async def batch_add_keys(request: BatchAddKeysRequest):
+    """
+    批量添加API密钥到配置
+
+    Args:
+        request: 包含API密钥列表的请求
+
+    Returns:
+        添加结果
+    """
+    try:
+        # 验证密钥格式（YouTube API密钥通常以AIza开头，长度39字符）
+        invalid_keys = []
+        for key in request.keys:
+            if not key.startswith('AIza') or len(key) != 39:
+                invalid_keys.append(key[:10] + '...')
+
+        if invalid_keys:
+            return ApiResponse.error(
+                message=f"Invalid API key format: {', '.join(invalid_keys)}",
+                code=400
+            )
+
+        # 使用settings service添加密钥
+        settings_service = get_settings_service()
+        existing_keys = settings_service.get_youtube_keys()
+
+        # 去重并添加新密钥
+        existing_keys_set = set(existing_keys)
+        new_keys = [key for key in request.keys if key not in existing_keys_set]
+
+        all_keys = existing_keys + new_keys
+
+        # 更新设置
+        settings_service.update_youtube_keys(api_keys=all_keys)
+
+        logger.info(f"Batch added {len(new_keys)} new API keys")
+
+        return ApiResponse.success(
+            data={
+                "total_added": len(new_keys),
+                "total_keys": len(all_keys),
+                "duplicates_skipped": len(request.keys) - len(new_keys)
+            },
+            message=f"Successfully added {len(new_keys)} new API keys"
+        )
+
+    except Exception as e:
+        logger.error(f"Error batch adding keys: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to batch add keys: {str(e)}",
             code=500
         )

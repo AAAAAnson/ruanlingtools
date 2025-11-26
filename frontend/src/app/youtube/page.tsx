@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
@@ -48,6 +48,122 @@ interface SearchResults {
   total_videos: number;
   timestamp: string;
 }
+
+/**
+ * API状态面板组件
+ */
+const ApiStatusPanel: React.FC = () => {
+  const [apiStatus, setApiStatus] = useState<{
+    total: number;
+    active: number;
+    exhausted: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  const fetchApiStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/youtube/keys/status`);
+      const data = await res.json();
+
+      if (data.code === 200) {
+        setApiStatus({
+          total: data.data.total,
+          active: data.data.active,
+          exhausted: data.data.exhausted
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch API status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApiStatus();
+    // 每30秒刷新一次
+    const interval = setInterval(fetchApiStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <PixelCard className="p-4">
+        <h3 className="text-lg font-bold mb-4 font-pixel">API Status</h3>
+        <p className="text-sm text-gray-500">Loading...</p>
+      </PixelCard>
+    );
+  }
+
+  if (!apiStatus) {
+    return null;
+  }
+
+  return (
+    <PixelCard className="p-4 sticky top-6">
+      <h3 className="text-lg font-bold mb-4 font-pixel">🔑 API Status</h3>
+
+      <div className="space-y-3">
+        {/* 总数 */}
+        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded">
+          <span className="text-sm font-medium">Total Keys:</span>
+          <span className="text-lg font-bold">{apiStatus.total}</span>
+        </div>
+
+        {/* 生效中 */}
+        <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+          <span className="text-sm font-medium text-green-700 dark:text-green-300">✓ Active:</span>
+          <span className="text-lg font-bold text-green-700 dark:text-green-300">{apiStatus.active}</span>
+        </div>
+
+        {/* 已用完 */}
+        <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+          <span className="text-sm font-medium text-red-700 dark:text-red-300">✗ Exhausted:</span>
+          <span className="text-lg font-bold text-red-700 dark:text-red-300">{apiStatus.exhausted}</span>
+        </div>
+      </div>
+
+      {/* 健康度指示器 */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Health:</span>
+          <span className="text-xs font-mono">
+            {apiStatus.total > 0
+              ? `${Math.round((apiStatus.active / apiStatus.total) * 100)}%`
+              : 'N/A'
+            }
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all ${
+              apiStatus.total > 0 && (apiStatus.active / apiStatus.total) > 0.5
+                ? 'bg-green-500'
+                : apiStatus.total > 0 && (apiStatus.active / apiStatus.total) > 0.2
+                ? 'bg-yellow-500'
+                : 'bg-red-500'
+            }`}
+            style={{
+              width: apiStatus.total > 0
+                ? `${(apiStatus.active / apiStatus.total) * 100}%`
+                : '0%'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 提示信息 */}
+      {apiStatus.active === 0 && apiStatus.total > 0 && (
+        <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+          <p className="text-xs text-yellow-800 dark:text-yellow-200">
+            ⚠️ All API keys exhausted! Please wait for quota reset or add more keys.
+          </p>
+        </div>
+      )}
+    </PixelCard>
+  );
+};
 
 export default function YouTubePage() {
   const router = useRouter();
@@ -140,7 +256,9 @@ export default function YouTubePage() {
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto">
-        <div>
+        <div className="flex gap-6">
+          {/* 左侧：原有的搜索表单和结果 */}
+          <div className="flex-1">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -498,6 +616,12 @@ export default function YouTubePage() {
               </div>
             </div>
           )}
+          </div>
+
+          {/* 右侧：API状态面板 */}
+          <div className="w-80">
+            <ApiStatusPanel />
+          </div>
         </div>
       </div>
     </MainLayout>
