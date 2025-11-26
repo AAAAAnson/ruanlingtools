@@ -207,7 +207,7 @@ export default function YouTubePage() {
               <div className="flex gap-2">
                 <PixelButton
                   onClick={() => window.open(`${API_BASE}/api/youtube/history`, '_blank')}
-                  variant="accent"
+                  variant="secondary"
                   size="sm"
                   icon={<History className="w-4 h-4" />}
                 >
@@ -480,7 +480,7 @@ export default function YouTubePage() {
               <div className="flex gap-3">
                 <PixelButton
                   onClick={fetchQuotaEstimate}
-                  variant="accent"
+                  variant="secondary"
                   size="lg"
                   disabled={isSearching}
                 >
