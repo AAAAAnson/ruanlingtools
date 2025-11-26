@@ -115,7 +115,7 @@ async def health_check():
 
 
 # Include routers
-from routers import image, text, pdf, ai, youtube, settings
+from routers import image, text, pdf, ai, youtube, settings, google_cloud
 
 app.include_router(image.router, prefix="/api/image", tags=["Image Tools"])
 app.include_router(text.router, prefix="/api/text", tags=["Text Tools"])
@@ -123,6 +123,7 @@ app.include_router(pdf.router, prefix="/api/pdf", tags=["PDF Tools"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI Tools"])
 app.include_router(youtube.router, prefix="/api/youtube", tags=["YouTube Tools"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(google_cloud.router, prefix="/api/google-cloud", tags=["Google Cloud"])
 
 
 # Startup event

@@ -170,3 +170,48 @@ async def get_youtube_config():
         },
         message="YouTube configuration status"
     )
+
+
+@router.get("/keys/status")
+async def get_keys_status():
+    """
+    获取API密钥状态概览（用于YouTube首页显示）
+
+    Returns:
+        API密钥状态摘要
+    """
+    try:
+        from services.youtube_service import YouTubeService
+        from services.youtube_quota_service import YouTubeQuotaService
+
+        # 获取API密钥数量
+        try:
+            yt_service = YouTubeService()
+            num_keys = len(yt_service.api_keys)
+        except ValueError:
+            # No API keys configured
+            return ApiResponse.success(
+                data={
+                    'total': 0,
+                    'active': 0,
+                    'exhausted': 0,
+                    'keys': []
+                },
+                message="No API keys configured"
+            )
+
+        # 获取状态
+        quota_service = YouTubeQuotaService()
+        status = quota_service.get_all_keys_status(num_keys)
+
+        return ApiResponse.success(
+            data=status,
+            message=f"Retrieved status for {num_keys} API keys"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting keys status: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get keys status: {str(e)}",
+            code=500
+        )
