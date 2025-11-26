@@ -84,155 +84,6 @@ const ApiKeysSummary: React.FC = () => {
 };
 
 /**
- * 批量生成API密钥组件 (OAuth授权)
- */
-const BatchGenerateKeys: React.FC<{ onKeysGenerated: () => void }> = ({ onKeysGenerated }) => {
-  const [projectCount, setProjectCount] = useState(1);
-  const [generating, setGenerating] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-  const handleOAuthGenerate = async () => {
-    setGenerating(true);
-    setMessage('');
-
-    try {
-      // Step 1: Get OAuth authorization URL
-      const authRes = await fetch(`${API_BASE}/api/settings/youtube/oauth/authorize?project_count=${projectCount}`);
-      const authData = await authRes.json();
-
-      if (authData.code === 200) {
-        // Open OAuth window
-        const width = 600;
-        const height = 700;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-
-        const authWindow = window.open(
-          authData.data.auth_url,
-          'OAuth Authorization',
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
-
-        // Listen for OAuth callback
-        const handleMessage = async (event: MessageEvent) => {
-          if (event.data.type === 'OAUTH_SUCCESS' && event.data.code) {
-            window.removeEventListener('message', handleMessage);
-
-            // Step 2: Generate keys with auth code
-            try {
-              const generateRes = await fetch(`${API_BASE}/api/settings/youtube/oauth/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  auth_code: event.data.code,
-                  project_count: projectCount
-                })
-              });
-
-              const generateData = await generateRes.json();
-
-              if (generateData.code === 200) {
-                setMessage(`Successfully generated ${generateData.data.keys_generated} API key(s)!`);
-                setMessageType('success');
-                onKeysGenerated();
-              } else {
-                setMessage(generateData.message || 'Failed to generate keys');
-                setMessageType('error');
-              }
-            } catch (error) {
-              setMessage('Error generating keys. Please try again.');
-              setMessageType('error');
-              console.error('Generate error:', error);
-            } finally {
-              setGenerating(false);
-            }
-          }
-        };
-
-        window.addEventListener('message', handleMessage);
-
-        // Check if window was closed without completing auth
-        const checkClosed = setInterval(() => {
-          if (authWindow?.closed) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', handleMessage);
-            if (generating) {
-              setGenerating(false);
-              setMessage('Authorization cancelled');
-              setMessageType('error');
-            }
-          }
-        }, 500);
-      } else {
-        setMessage(authData.message || 'Failed to start OAuth flow');
-        setMessageType('error');
-        setGenerating(false);
-      }
-    } catch (error) {
-      setMessage('Network error. Please try again.');
-      setMessageType('error');
-      setGenerating(false);
-      console.error('OAuth error:', error);
-    }
-  };
-
-  return (
-    <PixelCard className="p-6">
-      <h3 className="text-lg font-bold mb-4 font-pixel">🔐 Batch Generate Keys (OAuth)</h3>
-
-      <div className="mb-4 p-4 bg-blue-500/10 border-2 border-blue-500 rounded pixel-border">
-        <p className="text-sm text-gray-300 font-body mb-2">
-          <strong>Automated key generation via OAuth:</strong>
-        </p>
-        <ol className="text-xs text-gray-400 font-body space-y-1 ml-4">
-          <li>1. Authorize with your Google account</li>
-          <li>2. System automatically creates GCP projects</li>
-          <li>3. Enables YouTube Data API v3</li>
-          <li>4. Generates and saves API keys</li>
-        </ol>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-body text-gray-300 mb-2">
-            Number of Projects/Keys to Generate:
-          </label>
-          <PixelInput
-            type="number"
-            min="1"
-            max="10"
-            value={projectCount}
-            onChange={(e) => setProjectCount(parseInt(e.target.value) || 1)}
-            className="w-full"
-          />
-        </div>
-
-        {message && (
-          <div className={`p-4 rounded pixel-border border-2 ${
-            messageType === 'success'
-              ? 'bg-success/20 border-success text-success'
-              : 'bg-danger/20 border-danger text-danger'
-          }`}>
-            <p className="font-body text-sm">{message}</p>
-          </div>
-        )}
-
-        <PixelButton
-          onClick={handleOAuthGenerate}
-          loading={generating}
-          icon={<Key className="w-4 h-4" />}
-          className="w-full"
-        >
-          {generating ? 'Authorizing...' : 'Start OAuth Generation'}
-        </PixelButton>
-      </div>
-    </PixelCard>
-  );
-};
-
-/**
  * 批量添加API密钥组件 (手动输入)
  */
 const BatchAddKeys: React.FC<{ onKeysAdded: () => void }> = ({ onKeysAdded }) => {
@@ -527,10 +378,6 @@ export default function SettingsPage() {
     loadKeyStatus();
   }, []);
 
-  const handleKeysGenerated = () => {
-    window.location.reload();
-  };
-
   const handleKeysAdded = () => {
     window.location.reload();
   };
@@ -673,9 +520,6 @@ export default function SettingsPage() {
             <div className="space-y-6">
               {/* 顶部汇总统计 */}
               <ApiKeysSummary />
-
-              {/* 批量生成区域 */}
-              <BatchGenerateKeys onKeysGenerated={handleKeysGenerated} />
 
               {/* 批量添加区域 */}
               <BatchAddKeys onKeysAdded={handleKeysAdded} />
