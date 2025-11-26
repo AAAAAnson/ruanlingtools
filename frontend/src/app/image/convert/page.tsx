@@ -19,6 +19,7 @@ interface ConversionResult {
   size: number;
   size_mb: number;
   download_url: string;
+  requested_filename?: string;
 }
 
 interface ConversionResponse {
@@ -26,7 +27,7 @@ interface ConversionResponse {
   successful: number;
   failed: number;
   results: ConversionResult[];
-  errors?: Array<{ filename: string; error: string }>;
+  errors?: Array<{ filename: string; original_filename?: string; error: string }>;
 }
 
 // 统一的文件项接口
@@ -38,6 +39,7 @@ interface FileItem {
   progress?: number;
   result?: ConversionResult;
   error?: string;
+  displayName: string;
 }
 
 export default function ImageConvertPage() {
@@ -50,6 +52,7 @@ export default function ImageConvertPage() {
   const [height, setHeight] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [compareView, setCompareView] = useState<{ original: string; converted: string; filename: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -59,6 +62,12 @@ export default function ImageConvertPage() {
       return `${(bytes / 1024).toFixed(2)} KB`;
     }
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const extractBaseName = (filename: string): string => {
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1) return filename;
+    return filename.slice(0, lastDotIndex);
   };
 
   const handleFilesSelected = (selectedFiles: File[]) => {
@@ -73,7 +82,8 @@ export default function ImageConvertPage() {
           id: `${file.name}-${Date.now()}-${Math.random()}`,
           file,
           preview: reader.result as string,
-          status: 'pending'
+          status: 'pending',
+          displayName: extractBaseName(file.name)
         });
         loadedCount++;
 
@@ -108,6 +118,11 @@ export default function ImageConvertPage() {
       pendingItems.forEach(item => {
         formData.append('files', item.file);
       });
+
+      formData.append('target_names', JSON.stringify(pendingItems.map(item => ({
+        original: item.file.name,
+        custom: item.displayName
+      }))));
 
       formData.append('output_format', outputFormat);
       formData.append('quality', quality.toString());
@@ -146,16 +161,20 @@ export default function ImageConvertPage() {
           // 查找对应的结果
           const result = conversionData.results?.find(r => r.original_filename === item.file.name);
           if (result) {
+            const requestedName = result.requested_filename || item.displayName;
             return {
               ...item,
               status: 'success' as const,
               progress: 100,
-              result
+              result,
+              displayName: requestedName
             };
           }
 
           // 查找对应的错误
-          const error = conversionData.errors?.find(e => e.filename === item.file.name);
+          const error = conversionData.errors?.find(e =>
+            e.filename === item.file.name || e.original_filename === item.file.name || e.filename === item.displayName
+          );
           if (error) {
             return {
               ...item,
@@ -243,8 +262,32 @@ export default function ImageConvertPage() {
     setCompareView({
       original: item.preview,
       converted: convertedUrl,
-      filename: item.file.name
+      filename: item.displayName
     });
+  };
+
+  const handleStartEditingName = (id: string) => {
+    setEditingId(id);
+  };
+
+  const handleUpdateDisplayName = (id: string, value: string) => {
+    setFileItems(prev => prev.map(item =>
+      item.id === id
+        ? { ...item, displayName: value }
+        : item
+    ));
+  };
+
+  const handleFinishEditing = (id: string) => {
+    setFileItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const trimmed = item.displayName.trim();
+      return {
+        ...item,
+        displayName: trimmed || extractBaseName(item.file.name)
+      };
+    }));
+    setEditingId(null);
   };
 
   const pendingCount = fileItems.filter(item => item.status === 'pending').length;
@@ -341,17 +384,41 @@ export default function ImageConvertPage() {
                               <div className="flex-shrink-0 w-7 h-7 rounded border border-[#333344] overflow-hidden bg-black/30">
                                 <img
                                   src={item.preview}
-                                  alt={item.file.name}
+                                  alt={item.displayName}
                                   className="w-full h-full object-cover"
                                 />
                               </div>
 
                               {/* File Info */}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate" title={item.file.name}>
-                                  {item.file.name}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <div className="flex items-center gap-2">
+                                  {editingId === item.id ? (
+                                    <input
+                                      autoFocus
+                                      value={item.displayName}
+                                      onChange={(e) => handleUpdateDisplayName(item.id, e.target.value)}
+                                      onBlur={() => handleFinishEditing(item.id)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleFinishEditing(item.id);
+                                        }
+                                        if (e.key === 'Escape') {
+                                          setEditingId(null);
+                                        }
+                                      }}
+                                      className="bg-[#0F0F1E] border border-[#4ECDC4]/40 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-[#4ECDC4]"
+                                    />
+                                  ) : (
+                                    <p
+                                      className="text-sm font-medium truncate cursor-text"
+                                      title="Double-click to rename"
+                                      onDoubleClick={() => handleStartEditingName(item.id)}
+                                    >
+                                      {item.displayName}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                                   <span>{formatFileSize(item.file.size)}</span>
                                   {item.result && (
                                     <>
