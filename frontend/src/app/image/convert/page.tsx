@@ -210,8 +210,12 @@ export default function ImageConvertPage() {
     }
   };
 
-  const handleDownload = (filename: string) => {
-    const downloadUrl = `${API_BASE}/image/download/${filename}`;
+  const handleDownload = (item: FileItem) => {
+    if (!item.result) return;
+
+    // 使用用户自定义的显示名称 + 输出格式作为下载文件名
+    const customFilename = `${item.displayName}.${item.result.output_format}`;
+    const downloadUrl = `${API_BASE}/image/download/${item.result.converted_filename}?custom_name=${encodeURIComponent(customFilename)}`;
     window.open(downloadUrl, '_blank');
   };
 
@@ -220,14 +224,18 @@ export default function ImageConvertPage() {
     if (successItems.length === 0) return;
 
     try {
-      const filenames = successItems.map(item => item.result!.converted_filename);
+      // 构建文件映射：服务器文件名 -> 自定义文件名
+      const fileMapping = successItems.map(item => ({
+        server_filename: item.result!.converted_filename,
+        custom_filename: `${item.displayName}.${item.result!.output_format}`
+      }));
 
       const response = await fetch(`${API_BASE}/image/download-zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(filenames),
+        body: JSON.stringify(fileMapping),
       });
 
       if (response.ok) {
@@ -473,7 +481,7 @@ export default function ImageConvertPage() {
                                     <PixelButton
                                       size="sm"
                                       icon={<Download size={12} />}
-                                      onClick={() => handleDownload(item.result!.converted_filename)}
+                                      onClick={() => handleDownload(item)}
                                       title="Download"
                                     />
                                   </>

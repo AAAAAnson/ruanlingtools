@@ -276,12 +276,13 @@ async def get_supported_formats():
 
 
 @router.get("/download/{filename}")
-async def download_file(filename: str):
+async def download_file(filename: str, custom_name: Optional[str] = None):
     """
     Download a converted image file
 
     Args:
-        filename: Name of the file to download
+        filename: Name of the file to download (server-side filename)
+        custom_name: Optional custom filename for download (user-specified)
 
     Returns:
         FileResponse with the image file
@@ -296,9 +297,12 @@ async def download_file(filename: str):
         if not str(file_path.resolve()).startswith(str(Path(image_service.output_dir).resolve())):
             raise HTTPException(status_code=403, detail="Access denied")
 
+        # Use custom name if provided, otherwise use server filename
+        download_filename = custom_name if custom_name else filename
+
         return FileResponse(
             path=file_path,
-            filename=filename,
+            filename=download_filename,
             media_type="application/octet-stream"
         )
 
@@ -309,26 +313,37 @@ async def download_file(filename: str):
 
 
 @router.post("/download-zip")
-async def download_zip(filenames: List[str]):
+async def download_zip(file_mappings: List[Dict[str, str]]):
     """
     Download multiple files as a ZIP archive
 
     Args:
-        filenames: List of filenames to include in ZIP
+        file_mappings: List of dicts with 'server_filename' and 'custom_filename'
 
     Returns:
         FileResponse with ZIP archive
     """
     try:
-        if not filenames:
+        if not file_mappings:
             raise HTTPException(status_code=400, detail="No files specified")
 
-        # Collect valid files
+        # Collect valid files with custom names
         files_to_zip = []
         output_dir = Path(image_service.output_dir)
 
-        for filename in filenames:
-            file_path = output_dir / filename
+        for mapping in file_mappings:
+            # Support both old format (just strings) and new format (dicts)
+            if isinstance(mapping, str):
+                server_filename = mapping
+                custom_filename = mapping
+            else:
+                server_filename = mapping.get('server_filename')
+                custom_filename = mapping.get('custom_filename', server_filename)
+
+            if not server_filename:
+                continue
+
+            file_path = output_dir / server_filename
 
             # Validate file exists and is within output directory
             if not file_path.exists():
@@ -337,7 +352,8 @@ async def download_zip(filenames: List[str]):
             if not str(file_path.resolve()).startswith(str(output_dir.resolve())):
                 continue
 
-            files_to_zip.append((filename, file_path))
+            # Use custom filename in ZIP
+            files_to_zip.append((custom_filename, file_path))
 
         if not files_to_zip:
             raise HTTPException(status_code=404, detail="No valid files found")
