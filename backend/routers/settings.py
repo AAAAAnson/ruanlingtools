@@ -1,273 +1,158 @@
 # -*- coding: utf-8 -*-
 """
-Settings management routes
-
-This module handles application settings configuration
+Settings API Routes - YouTube API Key Management
 """
 import logging
-import os
-import json
 from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from models.response import ApiResponse
-from models.settings import ApplicationSettings, YouTubeAPIKeyUpdate
-from services.settings_service import get_settings_service
+from services.youtube_service import YouTubeService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/")
-async def get_settings():
+class BatchAddKeysRequest(BaseModel):
+    """Batch add API keys request"""
+    api_keys: List[str] = Field(..., min_items=1, max_items=50)
+
+
+@router.post("/youtube/keys/batch")
+async def batch_add_keys(request: BatchAddKeysRequest):
     """
-    Get current application settings
+    Batch add YouTube API keys
 
-    Returns:
-        ApiResponse with current settings
-    """
-    try:
-        settings_service = get_settings_service()
-        settings = settings_service.load_settings()
-
-        # Mask API keys for security (show only last 6 characters)
-        masked_settings = settings.model_dump()
-        if masked_settings.get('youtube', {}).get('api_keys'):
-            masked_keys = []
-            for key in masked_settings['youtube']['api_keys']:
-                if len(key) > 6:
-                    masked_keys.append('***' + key[-6:])
-                else:
-                    masked_keys.append('***')
-            masked_settings['youtube']['api_keys'] = masked_keys
-
-        return ApiResponse.success(
-            data=masked_settings,
-            message="Settings retrieved successfully"
-        )
-    except Exception as e:
-        logger.error(f"Error getting settings: {e}", exc_info=True)
-        return ApiResponse.error(
-            message=f"Failed to get settings: {str(e)}",
-            code=500
-        )
-
-
-@router.put("/youtube-keys")
-async def update_youtube_keys(update: YouTubeAPIKeyUpdate):
-    """
-    Update YouTube API keys
-
-    Args:
-        update: YouTube API keys update data
-
-    Returns:
-        ApiResponse with updated settings
+    Validates and adds multiple API keys at once
+    Automatically deduplicates existing keys
     """
     try:
-        settings_service = get_settings_service()
-
-        # Validate keys (basic format check)
+        # Validate key format (YouTube keys start with AIza, length 39)
         invalid_keys = []
-        for i, key in enumerate(update.api_keys):
-            if not key or len(key) < 30:  # YouTube keys are typically 39 chars
-                invalid_keys.append(f"Key #{i+1}")
+        valid_keys = []
+
+        for key in request.api_keys:
+            key = key.strip()
+            if not key.startswith('AIza') or len(key) != 39:
+                invalid_keys.append(key[:10] + '...')
+            else:
+                valid_keys.append(key)
 
         if invalid_keys:
             return ApiResponse.error(
-                message=f"Invalid API key format: {', '.join(invalid_keys)}",
+                message=f"Invalid key format: {', '.join(invalid_keys)}",
                 code=400
             )
 
-        # Update keys
-        settings = settings_service.update_youtube_keys(
-            api_keys=update.api_keys,
-            per_key_budget=update.per_key_budget
-        )
+        # Get existing keys
+        existing_keys = YouTubeService.get_all_keys()
+        existing_set = set(existing_keys)
 
-        logger.info(f"Updated {len(update.api_keys)} YouTube API keys")
+        # Filter out duplicates
+        new_keys = [k for k in valid_keys if k not in existing_set]
+        duplicates = len(valid_keys) - len(new_keys)
 
-        return ApiResponse.success(
-            data={
-                "api_keys_count": len(update.api_keys),
-                "per_key_budget": settings.youtube.per_key_budget
-            },
-            message=f"Successfully updated {len(update.api_keys)} YouTube API key(s)"
-        )
-    except Exception as e:
-        logger.error(f"Error updating YouTube keys: {e}", exc_info=True)
-        return ApiResponse.error(
-            message=f"Failed to update YouTube keys: {str(e)}",
-            code=500
-        )
+        # Save all keys
+        all_keys = existing_keys + new_keys
+        YouTubeService.save_keys(all_keys)
 
-
-@router.delete("/youtube-keys")
-async def clear_youtube_keys():
-    """
-    Clear all YouTube API keys
-
-    Returns:
-        ApiResponse confirming deletion
-    """
-    try:
-        settings_service = get_settings_service()
-        settings = settings_service.update_youtube_keys(api_keys=[])
-
-        logger.info("Cleared all YouTube API keys")
-
-        return ApiResponse.success(
-            message="All YouTube API keys have been cleared"
-        )
-    except Exception as e:
-        logger.error(f"Error clearing YouTube keys: {e}", exc_info=True)
-        return ApiResponse.error(
-            message=f"Failed to clear YouTube keys: {str(e)}",
-            code=500
-        )
-
-
-@router.get("/youtube-keys/status")
-async def get_youtube_keys_status():
-    """
-    Get YouTube API keys configuration status
-
-    Returns:
-        ApiResponse with keys status (count, masked keys)
-    """
-    try:
-        settings_service = get_settings_service()
-        keys = settings_service.get_youtube_keys()
-
-        # Mask keys
-        masked_keys = []
-        for key in keys:
-            if len(key) > 6:
-                masked_keys.append('***' + key[-6:])
-            else:
-                masked_keys.append('***')
+        logger.info(f"Added {len(new_keys)} new key(s), skipped {duplicates} duplicate(s)")
 
         return ApiResponse.success(
             data={
-                "configured": len(keys) > 0,
-                "keys_count": len(keys),
-                "keys": masked_keys
+                'added_count': len(new_keys),
+                'duplicate_count': duplicates,
+                'total_keys': len(all_keys)
             },
-            message=f"{len(keys)} YouTube API key(s) configured"
+            message=f"Added {len(new_keys)} key(s) successfully"
         )
+
     except Exception as e:
-        logger.error(f"Error getting YouTube keys status: {e}", exc_info=True)
+        logger.error(f"Failed to add keys: {e}", exc_info=True)
         return ApiResponse.error(
-            message=f"Failed to get YouTube keys status: {str(e)}",
+            message=f"Failed to add keys: {str(e)}",
             code=500
         )
-
-
-class BatchAddKeysRequest(BaseModel):
-    """批量添加密钥请求"""
-    keys: List[str] = Field(..., min_items=1, max_items=50, description="API密钥列表")
 
 
 @router.get("/youtube/keys/detailed")
-async def get_detailed_keys_info():
+async def get_detailed_keys():
     """
-    获取所有API密钥的详细使用情况（用于Settings页面）
+    Get detailed information about all API keys
 
-    Returns:
-        详细的密钥使用信息
-    """
-    try:
-        from services.youtube_service import YouTubeService
-        from services.youtube_quota_service import YouTubeQuotaService
-
-        # 获取API密钥数量
-        try:
-            yt_service = YouTubeService()
-            num_keys = len(yt_service.api_keys)
-        except ValueError:
-            # No API keys configured
-            return ApiResponse.success(
-                data={
-                    'summary': {
-                        'total_keys': 0,
-                        'total_used': 0,
-                        'total_remaining': 0,
-                        'total_quota': 0,
-                        'usage_percent': 0
-                    },
-                    'keys': []
-                },
-                message="No API keys configured"
-            )
-
-        # 获取详细信息
-        quota_service = YouTubeQuotaService()
-        detailed_info = quota_service.get_detailed_keys_info(num_keys)
-
-        return ApiResponse.success(
-            data=detailed_info,
-            message=f"Retrieved detailed info for {num_keys} API keys"
-        )
-
-    except Exception as e:
-        logger.error(f"Error getting detailed keys info: {e}", exc_info=True)
-        return ApiResponse.error(
-            message=f"Failed to get detailed keys info: {str(e)}",
-            code=500
-        )
-
-
-@router.post("/youtube/keys/batch-add")
-async def batch_add_keys(request: BatchAddKeysRequest):
-    """
-    批量添加API密钥到配置
-
-    Args:
-        request: 包含API密钥列表的请求
-
-    Returns:
-        添加结果
+    Returns masked keys with statistics
     """
     try:
-        # 验证密钥格式（YouTube API密钥通常以AIza开头，长度39字符）
-        invalid_keys = []
-        for key in request.keys:
-            if not key.startswith('AIza') or len(key) != 39:
-                invalid_keys.append(key[:10] + '...')
+        keys = YouTubeService.get_all_keys()
 
-        if invalid_keys:
-            return ApiResponse.error(
-                message=f"Invalid API key format: {', '.join(invalid_keys)}",
-                code=400
-            )
+        # Prepare detailed info
+        keys_info = []
+        for idx, key in enumerate(keys):
+            keys_info.append({
+                'id': f"key_{idx + 1}",
+                'masked_key': f"***{key[-6:]}" if len(key) > 6 else "***",
+                'index': idx + 1
+            })
 
-        # 使用settings service添加密钥
-        settings_service = get_settings_service()
-        existing_keys = settings_service.get_youtube_keys()
-
-        # 去重并添加新密钥
-        existing_keys_set = set(existing_keys)
-        new_keys = [key for key in request.keys if key not in existing_keys_set]
-
-        all_keys = existing_keys + new_keys
-
-        # 更新设置
-        settings_service.update_youtube_keys(api_keys=all_keys)
-
-        logger.info(f"Batch added {len(new_keys)} new API keys")
+        summary = {
+            'total_keys': len(keys),
+            'quota_per_key': 10000  # YouTube default daily quota
+        }
 
         return ApiResponse.success(
             data={
-                "total_added": len(new_keys),
-                "total_keys": len(all_keys),
-                "duplicates_skipped": len(request.keys) - len(new_keys)
+                'summary': summary,
+                'keys': keys_info
             },
-            message=f"Successfully added {len(new_keys)} new API keys"
+            message=f"Retrieved {len(keys)} key(s)"
         )
 
     except Exception as e:
-        logger.error(f"Error batch adding keys: {e}", exc_info=True)
+        logger.error(f"Failed to get keys info: {e}")
+        return ApiResponse.success(
+            data={'summary': {'total_keys': 0}, 'keys': []},
+            message="No keys configured"
+        )
+
+
+@router.delete("/youtube/keys/{key_id}")
+async def delete_key(key_id: str):
+    """
+    Delete a specific API key by ID
+
+    Args:
+        key_id: Key ID in format "key_N" where N is 1-based index
+    """
+    try:
+        # Extract index from key_id (format: key_1, key_2, etc.)
+        if not key_id.startswith('key_'):
+            return ApiResponse.error(message="Invalid key ID format", code=400)
+
+        try:
+            index = int(key_id.split('_')[1]) - 1  # Convert to 0-based index
+        except (IndexError, ValueError):
+            return ApiResponse.error(message="Invalid key ID", code=400)
+
+        # Get current keys
+        keys = YouTubeService.get_all_keys()
+
+        if index < 0 or index >= len(keys):
+            return ApiResponse.error(message="Key not found", code=404)
+
+        # Remove key
+        deleted_key = keys.pop(index)
+        YouTubeService.save_keys(keys)
+
+        logger.info(f"Deleted key #{index + 1}")
+
+        return ApiResponse.success(
+            data={'remaining_keys': len(keys)},
+            message="Key deleted successfully"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to delete key: {e}", exc_info=True)
         return ApiResponse.error(
-            message=f"Failed to batch add keys: {str(e)}",
+            message=f"Failed to delete key: {str(e)}",
             code=500
         )
