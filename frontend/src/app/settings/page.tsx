@@ -21,7 +21,7 @@ interface APIKeyStatus {
 const ApiKeysSummary: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   const fetchSummary = async () => {
     try {
@@ -91,7 +91,7 @@ const BatchAddKeys: React.FC<{ onKeysAdded: () => void }> = ({ onKeysAdded }) =>
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   const handleBatchAdd = async () => {
     const keys = keysText
@@ -195,7 +195,7 @@ const ApiKeysList: React.FC = () => {
   const [keys, setKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   const fetchKeys = async () => {
     try {
@@ -372,7 +372,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
     loadKeyStatus();
