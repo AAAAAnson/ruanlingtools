@@ -31,9 +31,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build arguments
+ARG NEXT_PUBLIC_API_URL
+ARG NODE_ENV=production
+
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_ENV=production
+    NODE_ENV=${NODE_ENV} \
+    NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build application
 RUN npm run build
