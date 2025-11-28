@@ -30,7 +30,7 @@ export default function SettingsPage() {
 
   const fetchKeys = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/settings/youtube/keys/detailed`);
+      const res = await fetch(`${API_BASE}/settings/youtube/keys/detailed`);
       const data = await res.json();
 
       if (data.code === 200) {
@@ -54,7 +54,7 @@ export default function SettingsPage() {
     setMessage('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/settings/youtube/keys/batch`, {
+      const res = await fetch(`${API_BASE}/settings/youtube/keys/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ api_keys: lines })
@@ -88,7 +88,7 @@ export default function SettingsPage() {
     setDeleting(keyId);
 
     try {
-      const res = await fetch(`${API_BASE}/api/settings/youtube/keys/${keyId}`, {
+      const res = await fetch(`${API_BASE}/settings/youtube/keys/${keyId}`, {
         method: 'DELETE'
       });
 

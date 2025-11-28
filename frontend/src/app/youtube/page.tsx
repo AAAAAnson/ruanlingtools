@@ -49,7 +49,7 @@ export default function YouTubePage() {
     setResults(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/youtube/kol-search`, {
+      const res = await fetch(`${API_BASE}/youtube/kol-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
