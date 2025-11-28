@@ -165,7 +165,7 @@ async def get_youtube_keys_status():
 
 class BatchAddKeysRequest(BaseModel):
     """批量添加密钥请求"""
-    keys: List[str] = Field(..., min_items=1, max_items=50, description="API密钥列表")
+    api_keys: List[str] = Field(..., min_items=1, max_items=50, description="API密钥列表")
 
 
 @router.get("/youtube/keys/detailed")
@@ -180,10 +180,11 @@ async def get_detailed_keys_info():
         from services.youtube_service import YouTubeService
         from services.youtube_quota_service import YouTubeQuotaService
 
-        # 获取API密钥数量
+        # 获取API密钥数量和实际密钥
         try:
             yt_service = YouTubeService()
             num_keys = len(yt_service.api_keys)
+            api_keys = yt_service.api_keys
         except ValueError:
             # No API keys configured
             return ApiResponse.success(
@@ -204,6 +205,22 @@ async def get_detailed_keys_info():
         quota_service = YouTubeQuotaService()
         detailed_info = quota_service.get_detailed_keys_info(num_keys)
 
+        # 添加前端需要的字段
+        for i, key_info in enumerate(detailed_info['keys']):
+            # 获取实际的API密钥并创建masked版本
+            actual_key = api_keys[i] if i < len(api_keys) else ''
+            if len(actual_key) > 10:
+                masked_key = actual_key[:4] + '...' + actual_key[-6:]
+            else:
+                masked_key = '****...****'
+
+            # 添加前端期望的字段
+            key_info['id'] = str(i)  # 使用索引作为ID
+            key_info['masked_key'] = masked_key
+            key_info['quota_used'] = key_info['used']  # 添加别名
+            key_info['quota_remaining'] = key_info['remaining']  # 添加别名
+            key_info['daily_budget'] = quota_service.DAILY_QUOTA_LIMIT
+
         return ApiResponse.success(
             data=detailed_info,
             message=f"Retrieved detailed info for {num_keys} API keys"
@@ -217,7 +234,64 @@ async def get_detailed_keys_info():
         )
 
 
-@router.post("/youtube/keys/batch-add")
+@router.delete("/youtube/keys/{key_id}")
+async def delete_youtube_key(key_id: str):
+    """
+    删除单个YouTube API密钥
+
+    Args:
+        key_id: 密钥ID（索引）
+
+    Returns:
+        ApiResponse confirming deletion
+    """
+    try:
+        # 验证key_id是有效的数字
+        try:
+            key_index = int(key_id)
+        except ValueError:
+            return ApiResponse.error(
+                message="Invalid key ID format",
+                code=400
+            )
+
+        # 获取当前所有密钥
+        settings_service = get_settings_service()
+        current_keys = settings_service.get_youtube_keys()
+
+        # 验证索引是否有效
+        if key_index < 0 or key_index >= len(current_keys):
+            return ApiResponse.error(
+                message=f"Key ID {key_id} not found",
+                code=404
+            )
+
+        # 删除指定索引的密钥
+        deleted_key = current_keys.pop(key_index)
+        masked_deleted = deleted_key[:4] + '...' + deleted_key[-6:] if len(deleted_key) > 10 else '****'
+
+        # 更新设置
+        settings_service.update_youtube_keys(api_keys=current_keys)
+
+        logger.info(f"Deleted YouTube API key at index {key_index}: {masked_deleted}")
+
+        return ApiResponse.success(
+            data={
+                "deleted_index": key_index,
+                "remaining_keys": len(current_keys)
+            },
+            message=f"Successfully deleted API key {masked_deleted}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error deleting YouTube key: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to delete YouTube key: {str(e)}",
+            code=500
+        )
+
+
+@router.post("/youtube/keys/batch")
 async def batch_add_keys(request: BatchAddKeysRequest):
     """
     批量添加API密钥到配置
@@ -231,7 +305,7 @@ async def batch_add_keys(request: BatchAddKeysRequest):
     try:
         # 验证密钥格式（YouTube API密钥通常以AIza开头，长度39字符）
         invalid_keys = []
-        for key in request.keys:
+        for key in request.api_keys:
             if not key.startswith('AIza') or len(key) != 39:
                 invalid_keys.append(key[:10] + '...')
 
@@ -247,7 +321,7 @@ async def batch_add_keys(request: BatchAddKeysRequest):
 
         # 去重并添加新密钥
         existing_keys_set = set(existing_keys)
-        new_keys = [key for key in request.keys if key not in existing_keys_set]
+        new_keys = [key for key in request.api_keys if key not in existing_keys_set]
 
         all_keys = existing_keys + new_keys
 
@@ -258,9 +332,9 @@ async def batch_add_keys(request: BatchAddKeysRequest):
 
         return ApiResponse.success(
             data={
-                "total_added": len(new_keys),
+                "added_count": len(new_keys),
                 "total_keys": len(all_keys),
-                "duplicates_skipped": len(request.keys) - len(new_keys)
+                "duplicates_skipped": len(request.api_keys) - len(new_keys)
             },
             message=f"Successfully added {len(new_keys)} new API keys"
         )
