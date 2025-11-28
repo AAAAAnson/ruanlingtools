@@ -35,6 +35,8 @@ backend/outputs/*
 !backend/outputs/.gitkeep
 backend/temp/*
 !backend/temp/.gitkeep
+backend/data/*
+!backend/data/.gitkeep
 frontend/next-env.d.ts
 
 # Docker
