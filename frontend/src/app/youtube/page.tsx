@@ -177,7 +177,7 @@ export default function YouTubePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <PixelCard hover>
+                <PixelCard hoverable>
                   <div className="flex gap-4">
                     {/* Thumbnail */}
                     <div className="flex-shrink-0">
