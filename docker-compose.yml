@@ -71,9 +71,12 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8888}
+      - HF_HOME=/app/models
+      - TRANSFORMERS_CACHE=/app/models
     volumes:
       - backend-uploads:/app/uploads
       - backend-outputs:/app/outputs
+      - backend-models:/app/models
       - backend-logs:/app
     restart: unless-stopped
     healthcheck:
@@ -101,6 +104,8 @@ volumes:
   backend-uploads:
     driver: local
   backend-outputs:
+    driver: local
+  backend-models:
     driver: local
   backend-logs:
     driver: local
