@@ -55,17 +55,33 @@ export default function TranscribePage() {
   const [availableModels, setAvailableModels] = useState<AudioModel[]>([]);
   const [previewContent, setPreviewContent] = useState<{ filename: string; content: string; format: string } | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+  // Always use relative URL for API calls (goes through nginx proxy)
+  // This works in browser, and useEffect/handlers are client-side only
+  const API_BASE = '/api';
 
-  // Fetch available models on mount
+  // Fetch available models on mount (client-side only)
   useEffect(() => {
     fetchAvailableModels();
   }, []);
 
   const fetchAvailableModels = async () => {
     try {
-      const response = await fetch(`${API_BASE}/audio/models`);
+      const url = `${API_BASE}/audio/models`;
+      console.log('Fetching models from:', url);
+
+      const response = await fetch(url);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Response not OK:', response.status, text.substring(0, 200));
+        return;
+      }
+
       const data = await response.json();
+      console.log('Models data:', data);
+
       if (data.code === 200 && data.data) {
         setAvailableModels(data.data.models || []);
         // Set default model to recommended one
@@ -76,6 +92,9 @@ export default function TranscribePage() {
       }
     } catch (error) {
       console.error('Failed to fetch models:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
     }
   };
 
