@@ -237,9 +237,9 @@ export default function TranscribePage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-pixel mb-4 text-gradient">Speech to Text</h1>
+          <h1 className="text-4xl font-pixel mb-4 text-gradient">AI Speech to Text</h1>
           <p className="text-gray-300">
-            Convert audio files to text using AI-powered transcription
+            Powered by OpenAI Whisper • Convert audio to text with 99+ language support
           </p>
         </div>
 
