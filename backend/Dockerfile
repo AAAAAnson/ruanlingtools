@@ -58,7 +58,7 @@ COPY . .
 # Create necessary directories with proper permissions
 RUN mkdir -p uploads outputs models/whisper && \
     chown -R appuser:appuser /app && \
-    chmod 755 uploads outputs models
+    chmod -R 777 uploads outputs models
 
 # Switch to non-root user
 USER appuser
