@@ -66,10 +66,16 @@ export default function TranscribePage() {
 
   const fetchAvailableModels = async () => {
     try {
-      const url = `${API_BASE}/audio/models`;
+      // Add timestamp to prevent caching
+      const url = `${API_BASE}/audio/models?t=${Date.now()}`;
       console.log('Fetching models from:', url);
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       console.log('Response status:', response.status);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
