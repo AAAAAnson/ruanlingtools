@@ -71,12 +71,12 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8888}
-      - HF_HOME=/app/models
-      - TRANSFORMERS_CACHE=/app/models
+      - HF_HOME=/app/whisper_models
+      - TRANSFORMERS_CACHE=/app/whisper_models
     volumes:
       - ./backend-data/uploads:/app/uploads
       - ./backend-data/outputs:/app/outputs
-      - ./backend-data/models:/app/models
+      - ./backend-data/whisper_models:/app/whisper_models
       - ./backend-data/logs:/app/logs
     restart: unless-stopped
     healthcheck:

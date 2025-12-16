@@ -33,7 +33,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Whisper (Audio) configuration
-WHISPER_MODELS_DIR = os.path.join(os.path.dirname(__file__), "models", "whisper")
+WHISPER_MODELS_DIR = os.path.join(os.path.dirname(__file__), "whisper_models")
 WHISPER_SUPPORTED_MODELS = ["tiny", "base", "small"]
 WHISPER_DEFAULT_MODEL = "base"
 WHISPER_MAX_FILE_SIZE_MB = 25
