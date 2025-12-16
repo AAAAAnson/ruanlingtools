@@ -42,6 +42,8 @@ interface FileItem {
   progress?: number;
   result?: TranscriptionResult;
   error?: string;
+  estimatedTimeRemaining?: number; // seconds
+  startTime?: number; // timestamp
 }
 
 export default function TranscribePage() {
@@ -117,6 +119,27 @@ export default function TranscribePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatTimeRemaining = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${Math.ceil(seconds)}秒`;
+    }
+    const mins = Math.ceil(seconds / 60);
+    return `${mins}分钟`;
+  };
+
+  // Estimate processing time based on file size and model
+  const estimateProcessingTime = (fileSizeBytes: number, model: string): number => {
+    const fileSizeMB = fileSizeBytes / (1024 * 1024);
+    // Rough estimates (seconds per MB) - adjust based on actual performance
+    const ratesPerMB: Record<string, number> = {
+      'tiny': 3,   // ~3 seconds per MB
+      'base': 5,   // ~5 seconds per MB
+      'small': 8,  // ~8 seconds per MB
+    };
+    const rate = ratesPerMB[model] || 5;
+    return fileSizeMB * rate + 10; // +10s for model loading overhead
+  };
+
   const handleFilesSelected = (files: File[]) => {
     const newItems: FileItem[] = files.map(file => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
@@ -143,9 +166,18 @@ export default function TranscribePage() {
 
     // Process files one by one for better UX
     for (const item of pendingItems) {
+      const estimatedTime = estimateProcessingTime(item.file.size, modelSize);
+      const startTime = Date.now();
+
       setFileItems(prev => prev.map(i =>
         i.id === item.id
-          ? { ...i, status: 'transcribing' as const, progress: 0 }
+          ? {
+              ...i,
+              status: 'transcribing' as const,
+              progress: 0,
+              startTime,
+              estimatedTimeRemaining: estimatedTime
+            }
           : i
       ));
 
@@ -159,14 +191,22 @@ export default function TranscribePage() {
           formData.append('language', language);
         }
 
-        // Simulate progress
+        // Smart progress simulation based on estimated time
         const progressInterval = setInterval(() => {
-          setFileItems(prev => prev.map(i =>
-            i.id === item.id && i.status === 'transcribing'
-              ? { ...i, progress: Math.min((i.progress || 0) + 10, 90) }
-              : i
-          ));
-        }, 1000);
+          setFileItems(prev => prev.map(i => {
+            if (i.id === item.id && i.status === 'transcribing') {
+              const elapsed = (Date.now() - startTime) / 1000; // seconds
+              const newProgress = Math.min((elapsed / estimatedTime) * 100, 95);
+              const remaining = Math.max(estimatedTime - elapsed, 0);
+              return {
+                ...i,
+                progress: newProgress,
+                estimatedTimeRemaining: remaining
+              };
+            }
+            return i;
+          }));
+        }, 500); // Update every 500ms for smoother progress
 
         const response = await fetch(`${API_BASE}/audio/transcribe`, {
           method: 'POST',
@@ -183,10 +223,16 @@ export default function TranscribePage() {
                   ...i,
                   status: 'success' as const,
                   progress: 100,
+                  estimatedTimeRemaining: 0,
                   result: data.data
                 }
               : i
           ));
+
+          // Auto-preview the first successful transcription
+          if (!previewContent) {
+            setTimeout(() => handlePreview(item), 500);
+          }
         } else {
           setFileItems(prev => prev.map(i =>
             i.id === item.id
@@ -377,6 +423,28 @@ export default function TranscribePage() {
                                   </>
                                 )}
                               </div>
+
+                              {/* Progress Bar for transcribing status */}
+                              {item.status === 'transcribing' && (
+                                <div className="mt-2">
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <span className="text-yellow-400">
+                                      {Math.round(item.progress || 0)}%
+                                    </span>
+                                    {item.estimatedTimeRemaining !== undefined && item.estimatedTimeRemaining > 0 && (
+                                      <span className="text-gray-400">
+                                        剩余 {formatTimeRemaining(item.estimatedTimeRemaining)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="w-full h-2 bg-[#0F0F1E] border border-[#333344] rounded overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-500 ease-out"
+                                      style={{ width: `${item.progress || 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Status */}
@@ -443,6 +511,35 @@ export default function TranscribePage() {
                           {item.error && (
                             <div className="mt-2 text-xs text-red-300 bg-red-900/20 p-2 rounded border border-red-500/30">
                               {item.error}
+                            </div>
+                          )}
+
+                          {/* Success Preview */}
+                          {item.status === 'success' && item.result && (
+                            <div className="mt-3 border-t border-[#333344] pt-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-medium text-[#4ECDC4]">转录结果</span>
+                                <PixelButton
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={<Copy size={12} />}
+                                  onClick={() => {
+                                    const content = typeof item.result!.content === 'string'
+                                      ? item.result!.content
+                                      : JSON.stringify(item.result!.content, null, 2);
+                                    navigator.clipboard.writeText(content);
+                                  }}
+                                >
+                                  复制文本
+                                </PixelButton>
+                              </div>
+                              <div className="bg-[#0F0F1E] border border-[#333344] rounded p-3 max-h-48 overflow-y-auto">
+                                <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
+                                  {typeof item.result.content === 'string'
+                                    ? item.result.content
+                                    : JSON.stringify(item.result.content, null, 2)}
+                                </pre>
+                              </div>
                             </div>
                           )}
                         </div>
