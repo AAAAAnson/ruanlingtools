@@ -1,6 +1,6 @@
 # Soft Collar Toolbox 2.0
 
-A pixel art themed web application for image, PDF, text processing, and YouTube KOL search.
+A pixel art themed web application for image, PDF, text processing, audio transcription, and YouTube KOL search.
 
 ## Features
 
@@ -20,6 +20,15 @@ A pixel art themed web application for image, PDF, text processing, and YouTube 
 - **Text Encoder**: Encode/decode text (Base64, URL encoding, etc.)
 - **Text Sorter**: Sort lines of text alphabetically or by custom rules
 - **Text Statistics**: Analyze text for word count, character count, and more
+
+### Audio Tools
+- **Speech to Text**: Convert audio files to text using OpenAI's Whisper model
+  - Support for 99+ languages with auto-detection
+  - Multiple model sizes (Tiny/Base/Small) optimized for 4GB RAM systems
+  - Output formats: Plain text, SRT subtitles, WebVTT, JSON
+  - Translate audio to English
+  - Batch processing support
+  - Supported formats: MP3, WAV, M4A, FLAC, OGG, AAC
 
 ### YouTube Tools
 - **KOL Search**: Search for influential YouTube channels by keyword
@@ -41,6 +50,7 @@ A pixel art themed web application for image, PDF, text processing, and YouTube 
 - **Language**: Python 3.11+
 - **Image Processing**: Pillow, pillow-avif
 - **PDF Processing**: PyPDF2, pdf2image
+- **Audio Processing**: faster-whisper, ffmpeg
 - **YouTube API**: Google API Python Client
 
 ### Deployment
@@ -224,6 +234,14 @@ When the backend is running, visit:
 - `POST /api/pdf/split` - Split PDF file
 - `POST /api/pdf/extract-text` - Extract text from PDF
 - `GET /api/pdf/info` - Get PDF metadata
+
+#### Audio
+- `POST /api/audio/transcribe` - Convert audio to text (speech-to-text)
+- `GET /api/audio/models` - Get available Whisper models
+- `GET /api/audio/languages` - Get supported languages
+- `GET /api/audio/formats` - Get supported audio formats
+- `GET /api/audio/download/{filename}` - Download transcription file
+- `GET /api/audio/health` - Audio service health check
 
 ## License
 
