@@ -42,6 +42,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -55,9 +56,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
 
 # Create necessary directories with proper permissions
-RUN mkdir -p uploads outputs && \
+RUN mkdir -p uploads outputs models/whisper && \
     chown -R appuser:appuser /app && \
-    chmod 755 uploads outputs
+    chmod 755 uploads outputs models
 
 # Switch to non-root user
 USER appuser

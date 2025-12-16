@@ -32,6 +32,15 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 # CORS configuration
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
+# Whisper (Audio) configuration
+WHISPER_MODELS_DIR = os.path.join(os.path.dirname(__file__), "models", "whisper")
+WHISPER_SUPPORTED_MODELS = ["tiny", "base", "small"]
+WHISPER_DEFAULT_MODEL = "base"
+WHISPER_MAX_FILE_SIZE_MB = 25
+WHISPER_DEVICE = "cpu"
+WHISPER_COMPUTE_TYPE = "int8"
+
 # Ensure directories exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(WHISPER_MODELS_DIR, exist_ok=True)
