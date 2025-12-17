@@ -1,0 +1,238 @@
+# -*- coding: utf-8 -*-
+"""
+iFlytek (讯飞) Speech Recognition Service
+使用讯飞语音转写API实现高准确度的中文语音识别
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import time
+from datetime import datetime
+from urllib.parse import urlencode
+import websocket
+import _thread as thread
+from typing import Optional, Dict, Any
+import logging
+
+from config import IFLYTEK_APPID, IFLYTEK_API_SECRET, IFLYTEK_API_KEY
+
+logger = logging.getLogger(__name__)
+
+
+class IFlytekASR:
+    """
+    讯飞语音识别服务类
+    使用WebSocket实时流式识别API
+    """
+
+    def __init__(self):
+        self.appid = IFLYTEK_APPID
+        self.api_secret = IFLYTEK_API_SECRET
+        self.api_key = IFLYTEK_API_KEY
+        self.result_text = ""
+        self.error_message = ""
+
+    def create_url(self):
+        """
+        生成鉴权URL
+        """
+        # 生成RFC1123格式的时间戳
+        now = datetime.now()
+        date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+        # 拼接字符串
+        signature_origin = f"host: iat-api.xfyun.cn\ndate: {date}\nGET /v2/iat HTTP/1.1"
+
+        # 进行hmac-sha256加密
+        signature_sha = hmac.new(
+            self.api_secret.encode('utf-8'),
+            signature_origin.encode('utf-8'),
+            digestmod=hashlib.sha256
+        ).digest()
+
+        signature_sha_base64 = base64.b64encode(signature_sha).decode(encoding='utf-8')
+
+        authorization_origin = f'api_key="{self.api_key}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
+
+        authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
+
+        # 将请求参数拼接到URL
+        params = {
+            "authorization": authorization,
+            "date": date,
+            "host": "iat-api.xfyun.cn"
+        }
+
+        url = f"wss://iat-api.xfyun.cn/v2/iat?{urlencode(params)}"
+        return url
+
+    def transcribe_file(
+        self,
+        audio_file_path: str,
+        language: str = "zh_cn",
+        output_format: str = "txt"
+    ) -> Dict[str, Any]:
+        """
+        转录音频文件
+
+        Args:
+            audio_file_path: 音频文件路径
+            language: 语言代码 (zh_cn, en_us等)
+            output_format: 输出格式
+
+        Returns:
+            包含转录结果的字典
+        """
+        try:
+            self.result_text = ""
+            self.error_message = ""
+
+            # 读取音频文件
+            with open(audio_file_path, 'rb') as f:
+                audio_data = f.read()
+
+            # 创建WebSocket连接
+            ws_url = self.create_url()
+
+            def on_message(ws, message):
+                """接收消息回调"""
+                try:
+                    data = json.loads(message)
+                    code = data.get('code')
+
+                    if code != 0:
+                        self.error_message = data.get('message', '识别失败')
+                        ws.close()
+                        return
+
+                    # 提取识别结果
+                    result = data.get('data', {}).get('result', {})
+                    ws_list = result.get('ws', [])
+
+                    for ws_item in ws_list:
+                        for cw in ws_item.get('cw', []):
+                            self.result_text += cw.get('w', '')
+
+                    # 如果是最后一帧,关闭连接
+                    if data.get('data', {}).get('status') == 2:
+                        ws.close()
+
+                except Exception as e:
+                    logger.error(f"处理消息时出错: {str(e)}")
+                    self.error_message = str(e)
+                    ws.close()
+
+            def on_error(ws, error):
+                """错误回调"""
+                logger.error(f"WebSocket错误: {error}")
+                self.error_message = str(error)
+
+            def on_close(ws, close_status_code, close_msg):
+                """关闭连接回调"""
+                logger.info("WebSocket连接已关闭")
+
+            def on_open(ws):
+                """打开连接回调"""
+                def run():
+                    try:
+                        # 发送音频数据
+                        frame_size = 8000  # 每次发送8KB
+                        interval = 0.04  # 40ms间隔
+
+                        # 发送开始帧
+                        params = {
+                            "common": {
+                                "app_id": self.appid
+                            },
+                            "business": {
+                                "language": language,
+                                "domain": "iat",
+                                "accent": "mandarin",
+                                "vad_eos": 5000,
+                                "dwa": "wpgs"  # 开启动态修正
+                            },
+                            "data": {
+                                "status": 0,
+                                "format": "audio/L16;rate=16000",
+                                "encoding": "raw",
+                                "audio": ""
+                            }
+                        }
+                        ws.send(json.dumps(params))
+
+                        # 分块发送音频数据
+                        for i in range(0, len(audio_data), frame_size):
+                            chunk = audio_data[i:i + frame_size]
+                            encoded = base64.b64encode(chunk).decode('utf-8')
+
+                            status = 1  # 中间帧
+                            if i + frame_size >= len(audio_data):
+                                status = 2  # 最后一帧
+
+                            params["data"]["status"] = status
+                            params["data"]["audio"] = encoded
+
+                            ws.send(json.dumps(params))
+                            time.sleep(interval)
+
+                    except Exception as e:
+                        logger.error(f"发送音频数据时出错: {str(e)}")
+                        self.error_message = str(e)
+                        ws.close()
+
+                thread.start_new_thread(run, ())
+
+            # 创建WebSocket连接
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close
+            )
+            ws.on_open = on_open
+            ws.run_forever()
+
+            # 检查错误
+            if self.error_message:
+                return {
+                    "success": False,
+                    "error": self.error_message
+                }
+
+            # 返回结果
+            return {
+                "success": True,
+                "text": self.result_text.strip(),
+                "language": language,
+                "engine": "iflytek",
+                "format": output_format
+            }
+
+        except Exception as e:
+            logger.error(f"讯飞语音识别失败: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+
+def transcribe_with_iflytek(
+    audio_file_path: str,
+    language: str = "zh_cn",
+    output_format: str = "txt"
+) -> Dict[str, Any]:
+    """
+    使用讯飞API转录音频文件
+
+    Args:
+        audio_file_path: 音频文件路径
+        language: 语言代码
+        output_format: 输出格式
+
+    Returns:
+        转录结果字典
+    """
+    asr = IFlytekASR()
+    return asr.transcribe_file(audio_file_path, language, output_format)

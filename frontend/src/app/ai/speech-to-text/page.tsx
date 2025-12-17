@@ -46,8 +46,23 @@ interface FileItem {
   startTime?: number; // timestamp
 }
 
+interface Engine {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  icon: string;
+  accuracy: string;
+  speed: string;
+  cost: string;
+  available: boolean;
+  default?: boolean;
+}
+
 export default function TranscribePage() {
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
+  const [engine, setEngine] = useState('whisper');
+  const [availableEngines, setAvailableEngines] = useState<Engine[]>([]);
   const [modelSize, setModelSize] = useState('base');
   const [language, setLanguage] = useState('');
   const [outputFormat, setOutputFormat] = useState('txt');
@@ -61,10 +76,37 @@ export default function TranscribePage() {
   // This works in browser, and useEffect/handlers are client-side only
   const API_BASE = '/api';
 
-  // Fetch available models on mount (client-side only)
+  // Fetch available engines and models on mount (client-side only)
   useEffect(() => {
+    fetchAvailableEngines();
     fetchAvailableModels();
   }, []);
+
+  const fetchAvailableEngines = async () => {
+    try {
+      const url = `${API_BASE}/audio/engines?t=${Date.now()}`;
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.code === 200 && data.data) {
+          setAvailableEngines(data.data.engines || []);
+          // Set default engine
+          const defaultEngine = data.data.engines.find((e: Engine) => e.default);
+          if (defaultEngine) {
+            setEngine(defaultEngine.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch engines:', error);
+    }
+  };
 
   const fetchAvailableModels = async () => {
     try {
@@ -184,6 +226,7 @@ export default function TranscribePage() {
       try {
         const formData = new FormData();
         formData.append('file', item.file);
+        formData.append('engine', engine);
         formData.append('model_size', modelSize);
         formData.append('output_format', outputFormat);
         formData.append('task', task);
@@ -601,11 +644,51 @@ export default function TranscribePage() {
               </div>
 
               <div className="space-y-4">
-                {/* Model */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Model
-                  </label>
+                {/* Engine Selection */}
+                {availableEngines.length > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      引擎 / Engine
+                    </label>
+                    <PixelSelect
+                      value={engine}
+                      onChange={(e) => setEngine(e.target.value)}
+                      options={availableEngines.map(eng => ({
+                        value: eng.id,
+                        label: `${eng.icon} ${eng.display_name}`,
+                        disabled: !eng.available
+                      }))}
+                    />
+                    {availableEngines.find(e => e.id === engine) && (
+                      <div className="mt-2 p-2 bg-[#0F0F1E] rounded border border-[#333344]">
+                        <p className="text-xs text-gray-400">
+                          {availableEngines.find(e => e.id === engine)?.description}
+                        </p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500">准确度: </span>
+                            <span className="text-[#4ECDC4]">{availableEngines.find(e => e.id === engine)?.accuracy}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">速度: </span>
+                            <span className="text-[#4ECDC4]">{availableEngines.find(e => e.id === engine)?.speed}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-500">成本: </span>
+                            <span className="text-[#4ECDC4]">{availableEngines.find(e => e.id === engine)?.cost}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Model (only show for Whisper) */}
+                {engine === 'whisper' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Model
+                    </label>
                   <PixelSelect
                     value={modelSize}
                     onChange={(e) => setModelSize(e.target.value)}
@@ -631,7 +714,8 @@ export default function TranscribePage() {
                       )}
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
 
                 {/* Language */}
                 <div>

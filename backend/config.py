@@ -40,6 +40,12 @@ WHISPER_MAX_FILE_SIZE_MB = 25
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 
+# iFlytek (讯飞) ASR configuration
+IFLYTEK_APPID = os.getenv("IFLYTEK_APPID", "")
+IFLYTEK_API_SECRET = os.getenv("IFLYTEK_API_SECRET", "")
+IFLYTEK_API_KEY = os.getenv("IFLYTEK_API_KEY", "")
+IFLYTEK_ENABLED = bool(IFLYTEK_APPID and IFLYTEK_API_SECRET and IFLYTEK_API_KEY)
+
 # Ensure directories exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
