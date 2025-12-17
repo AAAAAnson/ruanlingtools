@@ -223,6 +223,8 @@ async def transcribe_audio(
     """
     temp_audio_path = None
 
+    logger.info(f"=== 开始转录请求 === 文件: {file.filename}, 引擎: {engine}, 格式: {output_format}")
+
     try:
         # Validate file format
         file_ext = Path(file.filename).suffix.lower()
@@ -282,11 +284,14 @@ async def transcribe_audio(
             iflytek_lang = lang_map.get(language, "zh_cn")
 
             # Call iFlytek API
+            logger.info(f"调用讯飞API: 语言={iflytek_lang}, 文件={temp_audio_path}")
             result = transcribe_with_iflytek(
                 str(temp_audio_path),
                 language=iflytek_lang,
                 output_format=output_format
             )
+
+            logger.info(f"讯飞API返回: success={result.get('success')}, text_length={len(result.get('text', ''))}")
 
             if not result.get("success"):
                 return ApiResponse.error(
