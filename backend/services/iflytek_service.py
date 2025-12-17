@@ -9,12 +9,15 @@ import hashlib
 import hmac
 import json
 import time
+import os
 from datetime import datetime
 from urllib.parse import urlencode
+from pathlib import Path
 import websocket
 import _thread as thread
 from typing import Optional, Dict, Any
 import logging
+import ffmpeg
 
 from config import IFLYTEK_APPID, IFLYTEK_API_SECRET, IFLYTEK_API_KEY
 
@@ -33,6 +36,42 @@ class IFlytekASR:
         self.api_key = IFLYTEK_API_KEY
         self.result_text = ""
         self.error_message = ""
+
+    def convert_audio_to_pcm(self, input_path: str, output_path: str) -> bool:
+        """
+        将音频文件转换为PCM格式 (16kHz, 16bit, mono)
+
+        Args:
+            input_path: 输入音频文件路径
+            output_path: 输出PCM文件路径
+
+        Returns:
+            转换是否成功
+        """
+        try:
+            logger.info(f"开始转换音频: {input_path} -> {output_path}")
+
+            # 使用ffmpeg转换为PCM格式
+            stream = ffmpeg.input(input_path)
+            stream = ffmpeg.output(
+                stream,
+                output_path,
+                format='s16le',  # PCM signed 16-bit little-endian
+                acodec='pcm_s16le',
+                ac=1,  # 单声道
+                ar='16000'  # 采样率16kHz
+            )
+            ffmpeg.run(stream, capture_stdout=True, capture_stderr=True, overwrite_output=True)
+
+            logger.info(f"音频转换成功: {output_path}")
+            return True
+
+        except ffmpeg.Error as e:
+            logger.error(f"FFmpeg转换失败: {e.stderr.decode() if e.stderr else str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"音频转换异常: {str(e)}")
+            return False
 
     def create_url(self):
         """
@@ -85,12 +124,21 @@ class IFlytekASR:
         Returns:
             包含转录结果的字典
         """
+        pcm_file_path = None
         try:
             self.result_text = ""
             self.error_message = ""
 
-            # 读取音频文件
-            with open(audio_file_path, 'rb') as f:
+            # 将音频转换为PCM格式
+            pcm_file_path = str(Path(audio_file_path).with_suffix('.pcm'))
+            if not self.convert_audio_to_pcm(audio_file_path, pcm_file_path):
+                return {
+                    "success": False,
+                    "error": "音频格式转换失败"
+                }
+
+            # 读取PCM音频数据
+            with open(pcm_file_path, 'rb') as f:
                 audio_data = f.read()
 
             # 创建WebSocket连接
@@ -216,6 +264,15 @@ class IFlytekASR:
                 "success": False,
                 "error": str(e)
             }
+
+        finally:
+            # 清理临时PCM文件
+            if pcm_file_path and os.path.exists(pcm_file_path):
+                try:
+                    os.remove(pcm_file_path)
+                    logger.info(f"已删除临时PCM文件: {pcm_file_path}")
+                except Exception as e:
+                    logger.warning(f"删除临时PCM文件失败: {str(e)}")
 
 
 def transcribe_with_iflytek(
