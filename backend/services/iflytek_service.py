@@ -152,6 +152,7 @@ class IFlytekASR:
 
                     if code != 0:
                         self.error_message = data.get('message', '识别失败')
+                        logger.error(f"识别失败，错误码: {code}, 错误信息: {self.error_message}")
                         ws.close()
                         return
 
@@ -159,12 +160,20 @@ class IFlytekASR:
                     result = data.get('data', {}).get('result', {})
                     ws_list = result.get('ws', [])
 
+                    current_text = ""
                     for ws_item in ws_list:
                         for cw in ws_item.get('cw', []):
-                            self.result_text += cw.get('w', '')
+                            w = cw.get('w', '')
+                            current_text += w
+                            self.result_text += w
+
+                    if current_text:
+                        logger.info(f"收到识别结果: {current_text[:50]}... (当前总长度: {len(self.result_text)}字符)")
 
                     # 如果是最后一帧,关闭连接
-                    if data.get('data', {}).get('status') == 2:
+                    status = data.get('data', {}).get('status')
+                    if status == 2:
+                        logger.info(f"收到结束标记，最终文本长度: {len(self.result_text)}字符")
                         ws.close()
 
                 except Exception as e:
@@ -189,6 +198,9 @@ class IFlytekASR:
                         frame_size = 8000  # 每次发送8KB
                         interval = 0.04  # 40ms间隔
 
+                        audio_size_mb = len(audio_data) / (1024 * 1024)
+                        logger.info(f"准备发送音频数据: {audio_size_mb:.2f}MB, 共{len(audio_data)}字节")
+
                         # 发送开始帧
                         params = {
                             "common": {
@@ -198,7 +210,7 @@ class IFlytekASR:
                                 "language": language,
                                 "domain": "iat",
                                 "accent": "mandarin",
-                                "vad_eos": 5000,
+                                "vad_eos": 30000,  # 增加到30秒，避免长音频被截断
                                 "dwa": "wpgs"  # 开启动态修正
                             },
                             "data": {
@@ -209,8 +221,10 @@ class IFlytekASR:
                             }
                         }
                         ws.send(json.dumps(params))
+                        logger.info("已发送开始帧")
 
                         # 分块发送音频数据
+                        total_chunks = (len(audio_data) + frame_size - 1) // frame_size
                         for i in range(0, len(audio_data), frame_size):
                             chunk = audio_data[i:i + frame_size]
                             encoded = base64.b64encode(chunk).decode('utf-8')
@@ -223,7 +237,16 @@ class IFlytekASR:
                             params["data"]["audio"] = encoded
 
                             ws.send(json.dumps(params))
+
+                            # 每发送100个chunk记录一次进度
+                            chunk_num = i // frame_size + 1
+                            if chunk_num % 100 == 0 or status == 2:
+                                progress = (i / len(audio_data)) * 100
+                                logger.info(f"发送进度: {progress:.1f}% ({chunk_num}/{total_chunks} chunks)")
+
                             time.sleep(interval)
+
+                        logger.info("所有音频数据已发送完毕")
 
                     except Exception as e:
                         logger.error(f"发送音频数据时出错: {str(e)}")
