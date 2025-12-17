@@ -319,6 +319,15 @@ async def transcribe_audio(
                 "content": content
             }
 
+            # Clean up temp file
+            if temp_audio_path and temp_audio_path.exists():
+                temp_audio_path.unlink()
+
+            return ApiResponse.success(
+                data=response_data,
+                message=f"转录成功！引擎: 讯飞云端"
+            )
+
         else:
             # Use Whisper (default)
             segments, info = audio_service.transcribe(
