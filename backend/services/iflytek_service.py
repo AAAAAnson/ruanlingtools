@@ -160,15 +160,20 @@ class IFlytekASR:
                     result = data.get('data', {}).get('result', {})
                     ws_list = result.get('ws', [])
 
+                    # 只保存最终结果（ls=true），避免中间结果重复
+                    # ls (last slice): 表示这个句子的最后一个分片
                     current_text = ""
                     for ws_item in ws_list:
-                        for cw in ws_item.get('cw', []):
-                            w = cw.get('w', '')
-                            current_text += w
-                            self.result_text += w
+                        # 检查是否是最后一个分片
+                        is_last_slice = ws_item.get('ls', False)
+                        if is_last_slice:
+                            for cw in ws_item.get('cw', []):
+                                w = cw.get('w', '')
+                                current_text += w
+                                self.result_text += w
 
                     if current_text:
-                        logger.info(f"收到识别结果: {current_text[:50]}... (当前总长度: {len(self.result_text)}字符)")
+                        logger.info(f"收到最终识别结果: {current_text[:50]}... (当前总长度: {len(self.result_text)}字符)")
 
                     # 如果是最后一帧,关闭连接
                     status = data.get('data', {}).get('status')
