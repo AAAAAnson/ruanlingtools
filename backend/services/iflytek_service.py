@@ -150,9 +150,13 @@ class IFlytekASR:
                     data = json.loads(message)
                     code = data.get('code')
 
+                    # 记录原始消息用于调试（仅记录关键信息）
+                    logger.debug(f"收到消息 - 错误码: {code}, 数据状态: {data.get('data', {}).get('status', 'N/A')}")
+
                     if code != 0:
                         self.error_message = data.get('message', '识别失败')
                         logger.error(f"识别失败，错误码: {code}, 错误信息: {self.error_message}")
+                        logger.error(f"完整错误响应: {json.dumps(data, ensure_ascii=False)}")
                         ws.close()
                         return
 
@@ -189,11 +193,14 @@ class IFlytekASR:
             def on_error(ws, error):
                 """错误回调"""
                 logger.error(f"WebSocket错误: {error}")
+                logger.error(f"错误类型: {type(error).__name__}")
                 self.error_message = str(error)
 
             def on_close(ws, close_status_code, close_msg):
                 """关闭连接回调"""
-                logger.info("WebSocket连接已关闭")
+                logger.info(f"WebSocket连接已关闭 - 状态码: {close_status_code}, 消息: {close_msg}")
+                if close_status_code and close_status_code != 1000:
+                    logger.warning(f"非正常关闭 - 状态码: {close_status_code}")
 
             def on_open(ws):
                 """打开连接回调"""
@@ -231,6 +238,12 @@ class IFlytekASR:
                         # 分块发送音频数据
                         total_chunks = (len(audio_data) + frame_size - 1) // frame_size
                         for i in range(0, len(audio_data), frame_size):
+                            # 检查连接是否还活着
+                            if not ws.sock or not ws.sock.connected:
+                                logger.error(f"发送到第 {i} 字节时连接已断开")
+                                self.error_message = "WebSocket连接在发送过程中断开"
+                                break
+
                             chunk = audio_data[i:i + frame_size]
                             encoded = base64.b64encode(chunk).decode('utf-8')
 
