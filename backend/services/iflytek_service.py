@@ -141,6 +141,127 @@ class IFlytekASR:
             with open(pcm_file_path, 'rb') as f:
                 audio_data = f.read()
 
+            # 计算音频时长（PCM 16kHz 16bit mono = 32000 bytes/s）
+            duration_seconds = len(audio_data) / 32000
+            logger.info(f"音频时长: {duration_seconds:.1f}秒")
+
+            # 讯飞IAT API限制约60秒，超过则分段处理
+            MAX_SEGMENT_SECONDS = 50  # 留点余量，使用50秒
+            if duration_seconds > MAX_SEGMENT_SECONDS:
+                logger.info(f"音频超过{MAX_SEGMENT_SECONDS}秒，启用分段处理")
+                return self._transcribe_long_audio(audio_data, language, duration_seconds)
+
+            # 短音频直接处理
+            return self._transcribe_segment(audio_data, language)
+
+        except Exception as e:
+            logger.error(f"讯飞语音识别失败: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+        finally:
+            # 清理临时PCM文件
+            if pcm_file_path and os.path.exists(pcm_file_path):
+                try:
+                    os.remove(pcm_file_path)
+                    logger.info(f"已删除临时PCM文件: {pcm_file_path}")
+                except Exception as e:
+                    logger.warning(f"删除临时PCM文件失败: {str(e)}")
+
+    def _transcribe_long_audio(
+        self,
+        audio_data: bytes,
+        language: str,
+        total_duration: float
+    ) -> Dict[str, Any]:
+        """
+        分段处理长音频
+
+        Args:
+            audio_data: PCM音频数据
+            language: 语言代码
+            total_duration: 总时长(秒)
+
+        Returns:
+            转录结果字典
+        """
+        try:
+            SEGMENT_SECONDS = 50  # 每段50秒
+            bytes_per_second = 32000  # PCM 16kHz 16bit mono
+            segment_size = SEGMENT_SECONDS * bytes_per_second
+
+            all_text = []
+            total_segments = (len(audio_data) + segment_size - 1) // segment_size
+
+            logger.info(f"将{total_duration:.1f}秒音频分为{total_segments}段处理")
+
+            for i in range(0, len(audio_data), segment_size):
+                segment_num = i // segment_size + 1
+                segment_data = audio_data[i:i + segment_size]
+                segment_duration = len(segment_data) / bytes_per_second
+
+                logger.info(f"正在处理第{segment_num}/{total_segments}段 ({segment_duration:.1f}秒)")
+
+                # 重置result_text
+                self.result_text = ""
+                self.error_message = ""
+
+                # 转录这一段
+                result = self._transcribe_segment(segment_data, language)
+
+                if not result.get("success"):
+                    logger.error(f"第{segment_num}段转录失败: {result.get('error')}")
+                    return {
+                        "success": False,
+                        "error": f"第{segment_num}段转录失败: {result.get('error')}"
+                    }
+
+                segment_text = result.get("text", "").strip()
+                if segment_text:
+                    all_text.append(segment_text)
+                    logger.info(f"第{segment_num}段完成，获得{len(segment_text)}字符")
+
+                # 段间稍作延迟，避免频繁请求
+                if i + segment_size < len(audio_data):
+                    time.sleep(0.5)
+
+            # 合并所有段落
+            final_text = "".join(all_text)
+            logger.info(f"所有{total_segments}段处理完成，总共{len(final_text)}字符")
+
+            return {
+                "success": True,
+                "text": final_text,
+                "language": language,
+                "engine": "iflytek",
+                "segments": total_segments
+            }
+
+        except Exception as e:
+            logger.error(f"分段转录失败: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _transcribe_segment(
+        self,
+        audio_data: bytes,
+        language: str
+    ) -> Dict[str, Any]:
+        """
+        转录单个音频段
+
+        Args:
+            audio_data: PCM音频数据
+            language: 语言代码
+
+        Returns:
+            转录结果字典
+        """
+        try:
             # 创建WebSocket连接
             ws_url = self.create_url()
 
@@ -295,25 +416,15 @@ class IFlytekASR:
                 "success": True,
                 "text": self.result_text.strip(),
                 "language": language,
-                "engine": "iflytek",
-                "format": output_format
+                "engine": "iflytek"
             }
 
         except Exception as e:
-            logger.error(f"讯飞语音识别失败: {str(e)}")
+            logger.error(f"段音频识别失败: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
             }
-
-        finally:
-            # 清理临时PCM文件
-            if pcm_file_path and os.path.exists(pcm_file_path):
-                try:
-                    os.remove(pcm_file_path)
-                    logger.info(f"已删除临时PCM文件: {pcm_file_path}")
-                except Exception as e:
-                    logger.warning(f"删除临时PCM文件失败: {str(e)}")
 
 
 def transcribe_with_iflytek(
