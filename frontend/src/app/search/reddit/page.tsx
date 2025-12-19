@@ -233,7 +233,7 @@ export default function RedditPage() {
               </div>
               <PixelButton
                 onClick={() => router.push('/settings')}
-                variant="warning"
+                variant="primary"
                 size="sm"
               >
                 Go to Settings
