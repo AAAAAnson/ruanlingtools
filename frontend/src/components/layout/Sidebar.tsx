@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image, FileText, File, Wand2, Youtube, Home, Settings } from 'lucide-react';
+import { X, Image, FileText, File, Wand2, Search, Home, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 interface SidebarProps {
@@ -15,7 +15,7 @@ const navItems = [
   { href: '/text', label: 'Text Tools', icon: FileText },
   { href: '/pdf', label: 'PDF Tools', icon: File },
   { href: '/ai', label: 'AI Tools', icon: Wand2 },
-  { href: '/youtube', label: 'YouTube', icon: Youtube },
+  { href: '/search', label: 'Search Tools', icon: Search },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

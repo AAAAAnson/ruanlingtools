@@ -9,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
-from models.settings import ApplicationSettings, YouTubeAPISettings
+from models.settings import ApplicationSettings, YouTubeAPISettings, RedditAPISettings
 
 logger = logging.getLogger(__name__)
 
@@ -54,18 +54,36 @@ class SettingsService:
 
         # If no file or error, load from environment variables
         env_keys = os.getenv('YOUTUBE_API_KEY', '').strip()
+        reddit_client_id = os.getenv('REDDIT_CLIENT_ID', '').strip()
+        reddit_client_secret = os.getenv('REDDIT_CLIENT_SECRET', '').strip()
+        reddit_user_agent = os.getenv('REDDIT_USER_AGENT', '').strip()
+
+        # Build settings from environment
+        youtube_settings = YouTubeAPISettings()
         if env_keys:
             # Support both single key and comma-separated keys
             api_keys = [k.strip() for k in env_keys.split(',') if k.strip()]
             if api_keys:
-                settings = ApplicationSettings(
-                    youtube=YouTubeAPISettings(
-                        api_keys=api_keys,
-                        per_key_budget=int(os.getenv('PER_KEY_BUDGET', '9800'))
-                    )
+                youtube_settings = YouTubeAPISettings(
+                    api_keys=api_keys,
+                    per_key_budget=int(os.getenv('PER_KEY_BUDGET', '9800'))
                 )
-                logger.info(f"Settings loaded from environment ({len(api_keys)} API keys)")
-                return settings
+
+        reddit_settings = RedditAPISettings()
+        if reddit_client_id and reddit_client_secret and reddit_user_agent:
+            reddit_settings = RedditAPISettings(
+                client_id=reddit_client_id,
+                client_secret=reddit_client_secret,
+                user_agent=reddit_user_agent
+            )
+
+        if env_keys or (reddit_client_id and reddit_client_secret):
+            settings = ApplicationSettings(
+                youtube=youtube_settings,
+                reddit=reddit_settings
+            )
+            logger.info("Settings loaded from environment variables")
+            return settings
 
         # Return default settings
         logger.info("Using default settings")
@@ -137,6 +155,53 @@ class SettingsService:
         """
         keys = self.get_youtube_keys()
         return len(keys) > 0
+
+    def update_reddit_config(self, client_id: str, client_secret: str, user_agent: str) -> ApplicationSettings:
+        """
+        Update Reddit API credentials
+
+        Args:
+            client_id: Reddit application client ID
+            client_secret: Reddit application client secret
+            user_agent: Reddit API user agent
+
+        Returns:
+            Updated ApplicationSettings
+        """
+        settings = self.load_settings()
+
+        # Update Reddit settings
+        settings.reddit.client_id = client_id
+        settings.reddit.client_secret = client_secret
+        settings.reddit.user_agent = user_agent
+
+        # Save and return
+        self.save_settings(settings)
+        return settings
+
+    def get_reddit_config(self) -> dict:
+        """
+        Get Reddit API configuration
+
+        Returns:
+            Dictionary containing Reddit credentials
+        """
+        settings = self.load_settings()
+        return {
+            'client_id': settings.reddit.client_id,
+            'client_secret': settings.reddit.client_secret,
+            'user_agent': settings.reddit.user_agent
+        }
+
+    def has_reddit_config(self) -> bool:
+        """
+        Check if Reddit API credentials are configured
+
+        Returns:
+            True if all credentials are configured
+        """
+        config = self.get_reddit_config()
+        return bool(config['client_id'] and config['client_secret'] and config['user_agent'])
 
 
 # Global instance

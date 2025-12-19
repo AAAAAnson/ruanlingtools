@@ -11,7 +11,7 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from models.response import ApiResponse
-from models.settings import ApplicationSettings, YouTubeAPIKeyUpdate
+from models.settings import ApplicationSettings, YouTubeAPIKeyUpdate, RedditAPIUpdate
 from services.settings_service import get_settings_service
 
 router = APIRouter()
@@ -269,5 +269,74 @@ async def batch_add_keys(request: BatchAddKeysRequest):
         logger.error(f"Error batch adding keys: {e}", exc_info=True)
         return ApiResponse.error(
             message=f"Failed to batch add keys: {str(e)}",
+            code=500
+        )
+
+
+@router.put("/reddit")
+async def update_reddit_config(update: RedditAPIUpdate):
+    """
+    Update Reddit API credentials
+
+    Args:
+        update: Reddit API credentials update data
+
+    Returns:
+        ApiResponse with updated settings
+    """
+    try:
+        settings_service = get_settings_service()
+
+        # Update Reddit config
+        settings = settings_service.update_reddit_config(
+            client_id=update.client_id,
+            client_secret=update.client_secret,
+            user_agent=update.user_agent
+        )
+
+        logger.info("Updated Reddit API credentials")
+
+        return ApiResponse.success(
+            data={
+                "configured": True
+            },
+            message="Reddit API credentials updated successfully"
+        )
+    except Exception as e:
+        logger.error(f"Error updating Reddit config: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to update Reddit credentials: {str(e)}",
+            code=500
+        )
+
+
+@router.get("/reddit/status")
+async def get_reddit_config_status():
+    """
+    Get Reddit API configuration status
+
+    Returns:
+        ApiResponse with Reddit config status
+    """
+    try:
+        settings_service = get_settings_service()
+        config = settings_service.get_reddit_config()
+
+        configured = bool(
+            config.get('client_id') and
+            config.get('client_secret') and
+            config.get('user_agent')
+        )
+
+        return ApiResponse.success(
+            data={
+                "configured": configured
+            },
+            message="Reddit configuration status retrieved"
+        )
+    except Exception as e:
+        logger.error(f"Error getting Reddit config status: {e}", exc_info=True)
+        return ApiResponse.error(
+            message=f"Failed to get Reddit config status: {str(e)}",
             code=500
         )
