@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PixelCard } from '@/components/ui/PixelCard';
@@ -61,11 +61,6 @@ export default function RedditPage() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  // Check API configuration on mount
-  useState(() => {
-    checkApiConfig();
-  });
-
   const checkApiConfig = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/reddit/config`);
@@ -77,6 +72,11 @@ export default function RedditPage() {
       console.error('Failed to check API config:', err);
     }
   };
+
+  // Check API configuration on mount
+  useEffect(() => {
+    checkApiConfig();
+  }, []);
 
   const handleSearch = async () => {
     if (!keyword.trim()) {
